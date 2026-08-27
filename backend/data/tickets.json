@@ -1,0 +1,28 @@
+[
+  {
+    "storeName": "CTW",
+    "category": "Other",
+    "description": "123",
+    "assignee": "Tanakit Lertmana",
+    "status": "Pending",
+    "id": "J-20260827-0001",
+    "approval": "Approved",
+    "createdAt": "2026-08-27T14:41:25.324Z",
+    "updatedAt": "2026-08-27T14:41:31.398Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-08-27T14:41:31.398Z"
+  },
+  {
+    "storeName": "7 eleven",
+    "category": "POS / Register",
+    "description": "พัง",
+    "assignee": "Tanakit Lertmana",
+    "status": "Completed",
+    "id": "J-20260827-0002",
+    "approval": "Approved",
+    "createdAt": "2026-08-27T14:42:12.916Z",
+    "updatedAt": "2026-08-27T14:42:34.076Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-08-27T14:42:21.710Z"
+  }
+]
