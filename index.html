@@ -3,13 +3,149 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OWNDAYS Ticket Management</title>
+    <title>OWNDAYS Management Services</title>
+    <style>
+      :root {
+        --bg: #f4f7f8;
+        --card: #ffffff;
+        --primary: #173946;
+        --primary-soft: #e8f1f3;
+        --text: #1b1f23;
+        --muted: #5d6870;
+        --line: #dfe7ea;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: linear-gradient(180deg, #edf3f5 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 48px 20px 80px;
+      }
+
+      .hero {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 32px;
+        box-shadow: 0 10px 30px rgba(23, 57, 70, 0.06);
+      }
+
+      .eyebrow {
+        display: inline-block;
+        padding: 8px 12px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 12px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.15;
+      }
+
+      p {
+        color: var(--muted);
+        font-size: 1.02rem;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        margin-top: 28px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 24px;
+      }
+
+      .card h2 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        color: var(--primary);
+        font-size: 1.5rem;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text);
+        line-height: 1.8;
+      }
+
+      code {
+        background: #f1f5f6;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.95em;
+      }
+
+      .footer-note {
+        margin-top: 28px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--primary);
+        background: var(--primary-soft);
+        border-radius: 10px;
+      }
+    </style>
   </head>
   <body>
-    <main style="font-family: sans-serif; max-width: 680px; margin: 15vh auto; padding: 24px">
-      <h1>OWNDAYS Ticket Management</h1>
-      <p>โปรเจกต์ถูกแยกเป็น frontend React และ backend Node.js + Express แล้ว</p>
-      <p>เริ่มระบบด้วยคำสั่ง <code>npm run dev</code> และเปิด <code>http://localhost:5173</code></p>
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Management Services</span>
+        <h1>OWNDAYS Ticket Management & Asset Management</h1>
+        <p>
+          ระบบจัดการงานด้าน IT และทรัพย์สินภายในองค์กร โดยแยกส่วนการทำงานออกเป็น
+          <strong>Ticketing System</strong> และ <strong>Asset Management</strong>
+          เพื่อให้ทีมสามารถติดตามสถานะคำขอ จัดการทรัพย์สิน และสรุปรายงานได้อย่างชัดเจนและรวดเร็ว
+        </p>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Ticketing System</h2>
+          <ul>
+            <li>สร้าง Ticket ใหม่จากปัญหาหรือคำขอของสาขาและแผนกต่าง ๆ</li>
+            <li>ติดตามสถานะ เช่น Pending, In Progress, Completed, Rejected</li>
+            <li>มอบหมายงานให้ผู้รับผิดชอบและตรวจสอบความคืบหน้า</li>
+            <li>อนุมัติหรือปฏิเสธคำขอผ่านกระบวนการ approval</li>
+            <li>ดูสรุปรายงานตามหมวดหมู่และสถานะของ Ticket</li>
+            <li>ส่งออกข้อมูลเป็น CSV สำหรับการรายงานและจัดเก็บประวัติ</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Asset Management</h2>
+          <ul>
+            <li>จัดเก็บข้อมูลทรัพย์สิน เช่น คอมพิวเตอร์ โทรศัพท์ เครื่องพิมพ์ และอุปกรณ์ IT</li>
+            <li>ติดตามสถานะการใช้งาน ผู้รับผิดชอบ และประจำสาขา</li>
+            <li>จัดกลุ่มตามประเภทและความจำเป็นของอุปกรณ์</li>
+            <li>ติดตามการซ่อมบำรุง การย้ายตำแหน่ง และประกันอุปกรณ์</li>
+            <li>ช่วยให้สามารถวางแผนจัดซื้อและตรวจสอบทรัพย์สินได้อย่างมีประสิทธิภาพ</li>
+            <li>เชื่อมโยงกับ Ticketing System เพื่ออำนวยความสะดวกในการแก้ไขปัญหาที่เกี่ยวกับทรัพย์สิน</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="footer-note">
+        เริ่มต้นใช้งานด้วยคำสั่ง <code>npm run dev</code> และเปิด <code>http://localhost:5173</code>
+      </div>
     </main>
   </body>
 </html>
