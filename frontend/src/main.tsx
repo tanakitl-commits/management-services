@@ -32,6 +32,7 @@ type Ticket = {
   status: Status;
   approval: '' | 'Approved' | 'Rejected';
   createdAt: string;
+  completedAt?: string;
   attachments?: Attachment[];
 };
 type TicketForm = Omit<Ticket, 'id' | 'approval' | 'createdAt' | 'attachments'> & { attachments?: Attachment[] };
@@ -309,9 +310,9 @@ function App() {
 
   const exportCsv = () => {
     const csv = [
-      'ID,Store,Category,Description,Assignee,Status,Approval,Created',
+      'ID,Store,Category,Description,Assignee,Status,Approval,Created,Completed',
       ...tickets.map((ticket) =>
-        [ticket.id, ticket.storeName, ticket.category, ticket.description, ticket.assignee, ticket.status, ticket.approval, ticket.createdAt]
+        [ticket.id, ticket.storeName, ticket.category, ticket.description, ticket.assignee, ticket.status, ticket.approval, ticket.createdAt, ticket.completedAt || '-']
           .map((value) => `"${String(value).replace(/"/g, '""')}"`)
           .join(','),
       ),
@@ -887,7 +888,11 @@ function TicketRow({ ticket, onEdit, onApprove }: { ticket: Ticket; onEdit: () =
     <tr>
       <td>
         <b className="ticket-id">#{ticket.id}</b>
-        <small>{new Date(ticket.createdAt).toLocaleDateString('th-TH')}</small>
+        <small>
+          สร้าง: {new Date(ticket.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} 
+          {ticket.createdAt && ' ' + new Date(ticket.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+          {ticket.completedAt && <><br />ปิด: {new Date(ticket.completedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</>}
+        </small>
       </td>
       <td>{ticket.storeName}</td>
       <td>{ticket.category}</td>

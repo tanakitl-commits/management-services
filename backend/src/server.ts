@@ -52,6 +52,7 @@ type Ticket = z.infer<typeof ticketInputSchema> & {
   approval: '' | 'Approved' | 'Rejected';
   createdAt: string;
   updatedAt: string;
+  completedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
   attachments?: Array<{ name: string; type: string; data: string }>;
@@ -400,7 +401,16 @@ app.patch('/api/tickets/:id', async (req, res, next) => {
     const tickets = await readTickets();
     const index = tickets.findIndex((ticket) => ticket.id === req.params.id);
     if (index === -1) return res.status(404).json({ message: 'ไม่พบ Ticket' });
-    tickets[index] = { ...tickets[index], ...patch, updatedAt: new Date().toISOString() };
+    
+    const now = new Date().toISOString();
+    const updated: Ticket = {
+      ...tickets[index],
+      ...patch,
+      updatedAt: now,
+      // Auto-set completedAt when status changes to Completed
+      ...(patch.status === 'Completed' && tickets[index].status !== 'Completed' ? { completedAt: now } : {}),
+    };
+    tickets[index] = updated;
     await saveTickets(tickets);
     res.json(tickets[index]);
   } catch (error) {
