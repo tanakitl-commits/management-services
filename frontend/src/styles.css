@@ -1906,3 +1906,76 @@ button:focus-visible {
 .attachment-list .remove-file:hover {
   background: #c0392b;
 }
+
+.attachment-indicator {
+  display: inline-block;
+  color: #e74c3c;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.attachment-modal-content {
+  padding: 20px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  background: #f5fbf9;
+  border: 1px solid #d0e3de;
+  border-radius: 6px;
+  gap: 15px;
+}
+
+.file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.file-info strong {
+  color: #2d4a49;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.file-info small {
+  color: #7d9796;
+  font-size: 12px;
+}
+
+.download-button {
+  background: #3498db;
+  color: #fff;
+  border: 1px solid #2980b9;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.download-button:hover {
+  background: #2980b9;
+}
+
+.download-button:active {
+  transform: scale(0.98);
+}

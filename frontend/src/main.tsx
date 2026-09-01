@@ -163,6 +163,7 @@ function App() {
   const [modal, setModal] = useState<Ticket | 'new' | null>(null);
   const [assetModal, setAssetModal] = useState<Asset | 'new' | null>(null);
   const [userModal, setUserModal] = useState<User | 'new' | null>(null);
+  const [attachmentModal, setAttachmentModal] = useState<Ticket | null>(null);
   const [form, setForm] = useState<TicketForm>(emptyForm);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [assetForm, setAssetForm] = useState<Partial<Asset>>({
@@ -569,7 +570,7 @@ function App() {
                   </thead>
                   <tbody>
                     {filteredTickets.map((ticket) => (
-                      <TicketRow key={ticket.id} ticket={ticket} onEdit={() => openForm(ticket)} onApprove={(decision) => void approve(ticket, decision)} />
+                      <TicketRow key={ticket.id} ticket={ticket} onEdit={() => openForm(ticket)} onApprove={(decision) => void approve(ticket, decision)} onViewAttachments={(t) => setAttachmentModal(t)} />
                     ))}
                   </tbody>
                 </table>
@@ -630,6 +631,13 @@ function App() {
           onClose={() => setUserModal(null)}
           onSubmit={saveUser}
           editing={userModal !== 'new'}
+        />
+      )}
+
+      {attachmentModal && (
+        <AttachmentModal
+          ticket={attachmentModal}
+          onClose={() => setAttachmentModal(null)}
         />
       )}
     </div>
@@ -883,7 +891,7 @@ function Stat({ label, value, note }: { label: string; value: number; note: stri
   );
 }
 
-function TicketRow({ ticket, onEdit, onApprove }: { ticket: Ticket; onEdit: () => void; onApprove: (decision: 'Approved' | 'Rejected') => void }) {
+function TicketRow({ ticket, onEdit, onApprove, onViewAttachments }: { ticket: Ticket; onEdit: () => void; onApprove: (decision: 'Approved' | 'Rejected') => void; onViewAttachments?: (ticket: Ticket) => void }) {
   return (
     <tr>
       <td>
@@ -892,6 +900,7 @@ function TicketRow({ ticket, onEdit, onApprove }: { ticket: Ticket; onEdit: () =
           สร้าง: {new Date(ticket.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} 
           {ticket.createdAt && ' ' + new Date(ticket.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
           {ticket.completedAt && <><br />ปิด: {new Date(ticket.completedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</>}
+          {ticket.attachments && ticket.attachments.length > 0 && <><br /><span className="attachment-indicator">📎 {ticket.attachments.length} ไฟล์</span></>}
         </small>
       </td>
       <td>{ticket.storeName}</td>
@@ -908,6 +917,11 @@ function TicketRow({ ticket, onEdit, onApprove }: { ticket: Ticket; onEdit: () =
       </td>
       <td>
         <div className="actions">
+          {ticket.attachments && ticket.attachments.length > 0 && (
+            <button className="icon-button" title="ดูไฟล์แนบ" onClick={() => onViewAttachments?.(ticket)}>
+              📎
+            </button>
+          )}
           <button className="icon-button" title="แก้ไข" onClick={onEdit}>
             <Pencil size={14} />
           </button>
@@ -1628,6 +1642,65 @@ function TicketModal({
           <button className="primary">บันทึก Ticket</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function AttachmentModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
+  const downloadFile = (attachment: Attachment) => {
+    const byteCharacters = atob(attachment.data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: attachment.type });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = attachment.name;
+    link.click();
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <div className="modal-head">
+          <h2>ไฟล์แนบ - #{ticket.id}</h2>
+          <button type="button" className="close" onClick={onClose}>
+            <X />
+          </button>
+        </div>
+
+        <div className="attachment-modal-content">
+          {!ticket.attachments || ticket.attachments.length === 0 ? (
+            <p>ไม่มีไฟล์แนบ</p>
+          ) : (
+            <ul className="file-list">
+              {ticket.attachments.map((attachment, index) => (
+                <li key={index} className="file-item">
+                  <span className="file-info">
+                    <strong>{attachment.name}</strong>
+                    <small>{attachment.type}</small>
+                  </span>
+                  <button
+                    type="button"
+                    className="download-button"
+                    onClick={() => downloadFile(attachment)}
+                  >
+                    ดาวน์โหลด
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="primary" onClick={onClose}>
+            ปิด
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

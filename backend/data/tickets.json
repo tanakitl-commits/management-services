@@ -68,5 +68,19 @@
     "approvedBy": "Tanakit Lertmana",
     "approvedAt": "2026-09-01T10:33:53.447Z",
     "completedAt": "2026-09-01T10:34:08.867Z"
+  },
+  {
+    "storeName": "206 - SSQ - Seacon Square",
+    "category": "FRONT2 POS",
+    "description": "xcvxvccx",
+    "assignee": "7748",
+    "status": "In Progress",
+    "attachments": [],
+    "id": "J-20260901-0004",
+    "approval": "Approved",
+    "createdAt": "2026-09-01T10:36:07.051Z",
+    "updatedAt": "2026-09-01T10:36:22.425Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-09-01T10:36:22.425Z"
   }
 ]
