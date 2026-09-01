@@ -1,0 +1,420 @@
+{
+  "categories": [
+    "CCTV",
+    "CCTV(Tango)",
+    "EDC",
+    "E-Memo",
+    "Etc.",
+    "Front2 POS",
+    "Front2 Register",
+    "Gmail",
+    "Internet/WiFi",
+    "iPad",
+    "Laptop",
+    "Line Register",
+    "Microsoft 365",
+    "Mini PC(Tango)",
+    "Owndays Net",
+    "Owndays Net 2",
+    "Printer",
+    "Telephone",
+    "WorkGlobal"
+  ],
+  "vendors": [
+    "ADVANCED BUSINESS SOLUTIONS AND SERVICES CO.,LTD",
+    "APPLE SOUTH ASIA (THAILAND) CO.,LTD.",
+    "JPS CREATIVE INNOVATION CO.,LTD",
+    "N/A",
+    "NAKHON OA CO.,LTD.",
+    "OWNDAYS SINGAPORE PTE LTD",
+    "POWER BUY CO.,LTD.",
+    "SC GLOBAL TRADING CO., LTD."
+  ],
+  "locations": [
+    {
+      "id": "201",
+      "shortName": "MGB",
+      "fullName": "Mega Bangna"
+    },
+    {
+      "id": "203",
+      "shortName": "FPR",
+      "fullName": "Future Park Rangsit"
+    },
+    {
+      "id": "204",
+      "shortName": "CEV",
+      "fullName": "Central Eastville"
+    },
+    {
+      "id": "205",
+      "shortName": "SBK",
+      "fullName": "Seacon Bangkae"
+    },
+    {
+      "id": "206",
+      "shortName": "SSQ",
+      "fullName": "Seacon Square"
+    },
+    {
+      "id": "209",
+      "shortName": "FHI",
+      "fullName": "Fashion Island"
+    },
+    {
+      "id": "210",
+      "shortName": "MKR",
+      "fullName": "The Mall Korat"
+    },
+    {
+      "id": "214",
+      "shortName": "CUD",
+      "fullName": "Central Udonthani"
+    },
+    {
+      "id": "215",
+      "shortName": "CFC",
+      "fullName": "Central Chiangmai"
+    },
+    {
+      "id": "216",
+      "shortName": "GSV",
+      "fullName": "Gaysorn Village"
+    },
+    {
+      "id": "218",
+      "shortName": "CMC",
+      "fullName": "Central Mahachai"
+    },
+    {
+      "id": "220",
+      "shortName": "CPF",
+      "fullName": "Central Phuket"
+    },
+    {
+      "id": "222",
+      "shortName": "CWG",
+      "fullName": "Central Westgate"
+    },
+    {
+      "id": "223",
+      "shortName": "CTW",
+      "fullName": "CentralWorld"
+    },
+    {
+      "id": "224",
+      "shortName": "TMP",
+      "fullName": "Terminal21 Pattaya"
+    },
+    {
+      "id": "225",
+      "shortName": "ICS",
+      "fullName": "Iconsiam"
+    },
+    {
+      "id": "226",
+      "shortName": "GWB",
+      "fullName": "Gateway Bangsue"
+    },
+    {
+      "id": "230",
+      "shortName": "DKM",
+      "fullName": "Donki Mall Thonglor"
+    },
+    {
+      "id": "231",
+      "shortName": "RM3",
+      "fullName": "Central Rama 3"
+    },
+    {
+      "id": "236",
+      "shortName": "CVL",
+      "fullName": "Central Village"
+    },
+    {
+      "id": "238",
+      "shortName": "CHY",
+      "fullName": "Central Hatyai"
+    },
+    {
+      "id": "240",
+      "shortName": "CRG",
+      "fullName": "Central Rayong"
+    },
+    {
+      "id": "243",
+      "shortName": "SPO",
+      "fullName": "Siam Premium Outlets"
+    },
+    {
+      "id": "244",
+      "shortName": "SCT",
+      "fullName": "Siam Center"
+    },
+    {
+      "id": "248",
+      "shortName": "CLY",
+      "fullName": "Central Salaya"
+    },
+    {
+      "id": "249",
+      "shortName": "CPK",
+      "fullName": "Central Pinklao"
+    },
+    {
+      "id": "251",
+      "shortName": "CR2",
+      "fullName": "Central Rama 2"
+    },
+    {
+      "id": "252",
+      "shortName": "CRC",
+      "fullName": "Central Si Racha"
+    },
+    {
+      "id": "253",
+      "shortName": "CYY",
+      "fullName": "Central Ayutthaya"
+    },
+    {
+      "id": "254",
+      "shortName": "CKK",
+      "fullName": "Central Konkaen"
+    },
+    {
+      "id": "256",
+      "shortName": "CTR",
+      "fullName": "Central Chantaburi"
+    },
+    {
+      "id": "258",
+      "shortName": "TM3",
+      "fullName": "Terminal 21 Rama III"
+    },
+    {
+      "id": "266",
+      "shortName": "CRM",
+      "fullName": "Central Ramindra"
+    },
+    {
+      "id": "268",
+      "shortName": "CCR",
+      "fullName": "Central Chiangrai"
+    },
+    {
+      "id": "269",
+      "shortName": "CSM",
+      "fullName": "Central Samui"
+    },
+    {
+      "id": "270",
+      "shortName": "CNS",
+      "fullName": "Central Nakhon Si"
+    },
+    {
+      "id": "271",
+      "shortName": "MTL",
+      "fullName": "Marche Thonglor"
+    },
+    {
+      "id": "272",
+      "shortName": "PSL",
+      "fullName": "Park Silom"
+    },
+    {
+      "id": "275",
+      "shortName": "TBK",
+      "fullName": "The Mall Bangkae"
+    },
+    {
+      "id": "276",
+      "shortName": "CWV",
+      "fullName": "Central Westville"
+    },
+    {
+      "id": "279",
+      "shortName": "CNP",
+      "fullName": "Central Nakhon Pathom"
+    },
+    {
+      "id": "280",
+      "shortName": "TDP",
+      "fullName": "True Digital Park"
+    },
+    {
+      "id": "283",
+      "shortName": "VNS",
+      "fullName": "V-Square Plaza Nakhon Sawan"
+    },
+    {
+      "id": "284",
+      "shortName": "MSA",
+      "fullName": "Makro Sri Ayutthaya"
+    },
+    {
+      "id": "285",
+      "shortName": "CR9",
+      "fullName": "Central Rama 9"
+    },
+    {
+      "id": "286",
+      "shortName": "OBK",
+      "fullName": "One Bangkok"
+    },
+    {
+      "id": "288",
+      "shortName": "RRB",
+      "fullName": "Robinson Lifestyle Ratchaburi"
+    },
+    {
+      "id": "289",
+      "shortName": "VHH",
+      "fullName": "Market Village Huahin"
+    },
+    {
+      "id": "290",
+      "shortName": "MST",
+      "fullName": "Makro Sathon"
+    },
+    {
+      "id": "291",
+      "shortName": "RKB",
+      "fullName": "Robinson Lifestyle Kanchanaburi"
+    },
+    {
+      "id": "292",
+      "shortName": "EPR",
+      "fullName": "Esplanade Ratchada"
+    },
+    {
+      "id": "293",
+      "shortName": "RSB",
+      "fullName": "Robinson Lifestyle Saraburi"
+    },
+    {
+      "id": "294",
+      "shortName": "CAC",
+      "fullName": "Charn At The Avenue"
+    },
+    {
+      "id": "295",
+      "shortName": "SQ1",
+      "fullName": "Siam Square One"
+    },
+    {
+      "id": "296",
+      "shortName": "RLB",
+      "fullName": "Robinson Lifestyle Suvarnabhumi"
+    },
+    {
+      "id": "297",
+      "shortName": "MBP",
+      "fullName": "The Mall Bangkapi"
+    },
+    {
+      "id": "300",
+      "shortName": "MYC",
+      "fullName": "Maya Chiangmai"
+    },
+    {
+      "id": "7201",
+      "shortName": "RCS",
+      "fullName": "Robinson Lifestyle Chachoengsao"
+    },
+    {
+      "id": "7202",
+      "shortName": "CCA",
+      "fullName": "Central Chiangmai Airport"
+    },
+    {
+      "id": "7203",
+      "shortName": "OMT",
+      "fullName": "Outlet Square Muang Thong Thani"
+    },
+    {
+      "id": "7204",
+      "shortName": "CKB",
+      "fullName": "Central Krabi"
+    },
+    {
+      "id": "7205",
+      "shortName": "RLT",
+      "fullName": "Robinson Lifestyle Trang"
+    },
+    {
+      "id": "7206",
+      "shortName": "RCB",
+      "fullName": "Robinson Lifestyle Chonburi"
+    },
+    {
+      "id": "7207",
+      "shortName": "RBR",
+      "fullName": "Robinson Lifestyle Buriram"
+    },
+    {
+      "id": "7208",
+      "shortName": "IWS",
+      "fullName": "Imperial World Samrong"
+    },
+    {
+      "id": "7209",
+      "shortName": "GMB",
+      "fullName": "The Glass Market Bangna"
+    },
+    {
+      "id": "7210",
+      "shortName": "RSP",
+      "fullName": "Robinson Lifestyle Suphanburi"
+    },
+    {
+      "id": "7211",
+      "shortName": "CPL",
+      "fullName": "Central Phitsanulok"
+    },
+    {
+      "id": "7212",
+      "shortName": "CLP",
+      "fullName": "Central Lampang"
+    },
+    {
+      "id": "7213",
+      "shortName": "CKC",
+      "fullName": "Central Khonkaen Campus"
+    },
+    {
+      "id": "7214",
+      "shortName": "CNV",
+      "fullName": "Central Northville"
+    },
+    {
+      "id": "7215",
+      "shortName": "CST",
+      "fullName": "Central Suratthani"
+    },
+    {
+      "id": "7216",
+      "shortName": "CCW",
+      "fullName": "Central Chaengwattana"
+    },
+    {
+      "id": "7217",
+      "shortName": "HPT",
+      "fullName": "Happitat Bangna"
+    },
+    {
+      "id": "7218",
+      "shortName": "RRP",
+      "fullName": "Robinson Lifestyle Ratchaphruek"
+    },
+    {
+      "id": "7220",
+      "shortName": "RPC",
+      "fullName": "Robinson Lifestyle Prachinburi"
+    },
+    {
+      "id": "7221",
+      "shortName": "SLM",
+      "fullName": "Silom Road"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "staffId": "7748",
+    "name": "Tanakit Lertmana",
+    "password": "6081",
+    "role": "admin",
+    "permissions": {
+      "dashboard": true,
+      "tickets": true,
+      "assets": true,
+      "reports": true,
+      "administrator": true
+    }
+  },
+  {
+    "staffId": "9860",
+    "name": "Pacharapol Nilsang",
+    "password": "2184",
+    "role": "user",
+    "permissions": {
+      "dashboard": true,
+      "tickets": true,
+      "assets": true,
+      "reports": true,
+      "administrator": false
+    }
+  }
+]

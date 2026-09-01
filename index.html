@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,7 +15,9 @@
         --line: #dfe7ea;
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         font-family: Arial, Helvetica, sans-serif;
@@ -111,9 +113,11 @@
         <span class="eyebrow">Management Services</span>
         <h1>OWNDAYS Ticket Management & Asset Management</h1>
         <p>
-          ระบบจัดการงานด้าน IT และทรัพย์สินภายในองค์กร โดยแยกส่วนการทำงานออกเป็น
-          <strong>Ticketing System</strong> และ <strong>Asset Management</strong>
-          เพื่อให้ทีมสามารถติดตามสถานะคำขอ จัดการทรัพย์สิน และสรุปรายงานได้อย่างชัดเจนและรวดเร็ว
+          An internal IT and asset management platform with dedicated
+          <strong>Ticketing System</strong> and
+          <strong>Asset Management</strong>
+          workflows, helping teams track requests, manage assets, and review
+          reports clearly and efficiently.
         </p>
       </section>
 
@@ -121,30 +125,36 @@
         <section class="card">
           <h2>Ticketing System</h2>
           <ul>
-            <li>สร้าง Ticket ใหม่จากปัญหาหรือคำขอของสาขาและแผนกต่าง ๆ</li>
-            <li>ติดตามสถานะ เช่น Pending, In Progress, Completed, Rejected</li>
-            <li>มอบหมายงานให้ผู้รับผิดชอบและตรวจสอบความคืบหน้า</li>
-            <li>อนุมัติหรือปฏิเสธคำขอผ่านกระบวนการ approval</li>
-            <li>ดูสรุปรายงานตามหมวดหมู่และสถานะของ Ticket</li>
-            <li>ส่งออกข้อมูลเป็น CSV สำหรับการรายงานและจัดเก็บประวัติ</li>
+            <li>Create tickets for branch and department issues or requests</li>
+            <li>
+              Track statuses such as Pending, In Progress, Completed, and
+              Rejected
+            </li>
+            <li>Assign work and monitor progress</li>
+            <li>Approve or reject requests through the approval workflow</li>
+            <li>Review reports by ticket category and status</li>
+            <li>Export data as CSV for reporting and historical records</li>
           </ul>
         </section>
 
         <section class="card">
           <h2>Asset Management</h2>
           <ul>
-            <li>จัดเก็บข้อมูลทรัพย์สิน เช่น คอมพิวเตอร์ โทรศัพท์ เครื่องพิมพ์ และอุปกรณ์ IT</li>
-            <li>ติดตามสถานะการใช้งาน ผู้รับผิดชอบ และประจำสาขา</li>
-            <li>จัดกลุ่มตามประเภทและความจำเป็นของอุปกรณ์</li>
-            <li>ติดตามการซ่อมบำรุง การย้ายตำแหน่ง และประกันอุปกรณ์</li>
-            <li>ช่วยให้สามารถวางแผนจัดซื้อและตรวจสอบทรัพย์สินได้อย่างมีประสิทธิภาพ</li>
-            <li>เชื่อมโยงกับ Ticketing System เพื่ออำนวยความสะดวกในการแก้ไขปัญหาที่เกี่ยวกับทรัพย์สิน</li>
+            <li>Store computer, phone, printer, and other IT asset records</li>
+            <li>Track usage status, owners, and branch locations</li>
+            <li>Organize equipment by type and operational needs</li>
+            <li>Track maintenance, transfers, and equipment warranties</li>
+            <li>Support efficient purchasing plans and asset audits</li>
+            <li>
+              Connect with the Ticketing System to resolve asset-related issues
+            </li>
           </ul>
         </section>
       </div>
 
       <div class="footer-note">
-        เริ่มต้นใช้งานด้วยคำสั่ง <code>npm run dev</code> และเปิด <code>http://localhost:5173</code>
+        Start the application with <code>npm run dev</code> and open
+        <code>http://localhost:5173</code>
       </div>
     </main>
   </body>
