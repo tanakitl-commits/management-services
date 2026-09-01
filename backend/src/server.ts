@@ -25,6 +25,7 @@ const attachmentSchema = z.object({
   type: z.string().min(1),
   data: z.string().min(1),
 });
+const normalizeMasterDataText = (value: string) => value.trim().toUpperCase();
 const ticketInputSchema = z.object({
   storeName: z.string().trim().min(1).max(120),
   category: z.string().trim().min(1).max(80),
@@ -95,10 +96,12 @@ type LocationMasterItem = {
   id: string;
   shortName: string;
   fullName: string;
+  budget?: number;
 };
 
 type MasterData = {
   categories: string[];
+  assetTypes: string[];
   vendors: string[];
   locations: LocationMasterItem[];
 };
@@ -110,9 +113,10 @@ function normalizeLocationEntry(value: string | LocationMasterItem | null | unde
     const id = (value.id ?? '').trim();
     const shortName = (value.shortName ?? '').trim();
     const fullName = (value.fullName ?? '').trim();
+    const budget = typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0 ? value.budget : undefined;
 
     if (!id && !shortName && !fullName) return null;
-    return { id: id || shortName || fullName, shortName, fullName };
+    return { id: id || shortName || fullName, shortName, fullName, budget };
   }
 
   const text = value.trim();
@@ -178,6 +182,7 @@ async function readMasterData(): Promise<MasterData> {
     readAssets(),
     readJsonFile<MasterData>(masterDataFile, {
       categories: [],
+      assetTypes: [],
       vendors: [],
       locations: [],
     }),
@@ -188,8 +193,9 @@ async function readMasterData(): Promise<MasterData> {
     .forEach((location) => uniqueLocations.set(locationKey(location), location));
 
   const merged: MasterData = {
-    categories: storedData.categories,
-    vendors: storedData.vendors,
+    categories: [...new Set(storedData.categories.map(normalizeMasterDataText))],
+    assetTypes: [...new Set((storedData.assetTypes ?? []).map(normalizeMasterDataText))],
+    vendors: [...new Set(storedData.vendors.map(normalizeMasterDataText))],
     locations: [...uniqueLocations.values()].sort((a, b) => `${a.id} ${a.shortName} ${a.fullName}`.localeCompare(`${b.id} ${b.shortName} ${b.fullName}`, 'th', { sensitivity: 'base' })),
   };
 
@@ -203,10 +209,10 @@ async function readMasterData(): Promise<MasterData> {
 function createTicketId(tickets: Ticket[], createdAt: Date) {
   const datePart = createdAt.toISOString().slice(0, 10).replaceAll('-', '');
   const sequence = tickets.reduce((highest, ticket) => {
-    const match = ticket.id.match(new RegExp(`^J-${datePart}-(\\d{4})$`));
+    const match = ticket.id.match(new RegExp(`^IT-${datePart}-(\\d{4})$`));
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, 0) + 1;
-  return `J-${datePart}-${String(sequence).padStart(4, '0')}`;
+  return `IT-${datePart}-${String(sequence).padStart(4, '0')}`;
 }
 
 function sendValidationError(res: express.Response, error: z.ZodError) {
@@ -315,6 +321,7 @@ app.put('/api/master-data', async (req, res, next) => {
   try {
     const payload = z.object({
       categories: z.array(z.string().trim().min(1)).default([]),
+      assetTypes: z.array(z.string().trim().min(1)).default([]),
       vendors: z.array(z.string().trim().min(1)).default([]),
       locations: z.array(
         z.union([
@@ -323,6 +330,7 @@ app.put('/api/master-data', async (req, res, next) => {
             id: z.string().trim().min(1),
             shortName: z.string().trim().default(''),
             fullName: z.string().trim().default(''),
+            budget: z.number().finite().min(0).optional(),
           }),
         ]),
       ).default([]),
@@ -336,8 +344,9 @@ app.put('/api/master-data', async (req, res, next) => {
     normalizedLocations.forEach((location) => uniqueLocations.set(locationKey(location), location));
 
     const masterData: MasterData = {
-      categories: [...new Set(payload.categories.map((item) => item.trim()))],
-      vendors: [...new Set(payload.vendors.map((item) => item.trim()))],
+      categories: [...new Set(payload.categories.map(normalizeMasterDataText))],
+      assetTypes: [...new Set(payload.assetTypes.map(normalizeMasterDataText))],
+      vendors: [...new Set(payload.vendors.map(normalizeMasterDataText))],
       locations: [...uniqueLocations.values()].sort((a, b) => `${a.id} ${a.shortName} ${a.fullName}`.localeCompare(`${b.id} ${b.shortName} ${b.fullName}`, 'th', { sensitivity: 'base' })),
     };
 
