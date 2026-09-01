@@ -1605,13 +1605,14 @@ function TicketModal({
               <ul>
                 {attachmentFiles.map((file) => (
                   <li key={file.name}>
-                    {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                    <span>{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
                     <button
                       type="button"
                       className="remove-file"
+                      title="ลบไฟล์นี้"
                       onClick={() => setAttachmentFiles(attachmentFiles.filter((f) => f.name !== file.name))}
                     >
-                      ✕
+                      ลบ
                     </button>
                   </li>
                 ))}

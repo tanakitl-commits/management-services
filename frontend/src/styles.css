@@ -1882,17 +1882,27 @@ button:focus-visible {
   color: #2d4a49;
 }
 
+.attachment-list li span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .attachment-list .remove-file {
-  background: none;
-  border: none;
-  color: #e74c3c;
+  background: #e74c3c;
+  color: #fff;
+  border: 1px solid #c0392b;
   cursor: pointer;
-  font-size: 14px;
-  padding: 0;
-  margin-left: 8px;
-  line-height: 1;
+  font-size: 12px;
+  padding: 4px 12px;
+  margin-left: 12px;
+  border-radius: 4px;
+  line-height: 1.2;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
 }
 
 .attachment-list .remove-file:hover {
-  color: #c0392b;
+  background: #c0392b;
 }

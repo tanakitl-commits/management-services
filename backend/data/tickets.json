@@ -44,13 +44,29 @@
     "category": "MICROSOFT 365",
     "description": "435534534535353453534534534543543534534534534",
     "assignee": "7748",
-    "status": "Pending",
+    "status": "Completed",
     "attachments": [],
     "id": "J-20260901-0002",
     "approval": "Approved",
     "createdAt": "2026-09-01T10:23:22.904Z",
-    "updatedAt": "2026-09-01T10:23:31.921Z",
+    "updatedAt": "2026-09-01T10:34:46.674Z",
     "approvedBy": "Tanakit Lertmana",
-    "approvedAt": "2026-09-01T10:23:31.921Z"
+    "approvedAt": "2026-09-01T10:23:31.921Z",
+    "completedAt": "2026-09-01T10:34:46.674Z"
+  },
+  {
+    "storeName": "231 - RM3 - Central Rama 3",
+    "category": "PRINTER",
+    "description": "141234341regegggtgtrgrgrt",
+    "assignee": "7748",
+    "status": "Completed",
+    "attachments": [],
+    "id": "J-20260901-0003",
+    "approval": "Approved",
+    "createdAt": "2026-09-01T10:33:47.991Z",
+    "updatedAt": "2026-09-01T10:34:08.867Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-09-01T10:33:53.447Z",
+    "completedAt": "2026-09-01T10:34:08.867Z"
   }
 ]
