@@ -4,6 +4,8 @@ import {
   BarChart3,
   Calendar,
   Check,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Download,
   LayoutDashboard,
@@ -12,6 +14,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Warehouse,
   X,
 } from 'lucide-react';
@@ -136,6 +139,21 @@ const formatResolutionDuration = (createdAt: string, completedAt?: string) => {
   const minutes = durationMinutes % 60;
   return [days && `${days} วัน`, hours && `${hours} ชม.`, `${minutes} นาที`].filter(Boolean).join(' ');
 };
+
+const getAssetUsageMonths = (asset: Asset) => {
+  const usageStartDate = asset.installationDate || asset.purchaseDate;
+  if (!usageStartDate) return null;
+
+  const startDate = new Date(`${usageStartDate}T00:00:00`);
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  const today = new Date();
+  let months = (today.getFullYear() - startDate.getFullYear()) * 12 + today.getMonth() - startDate.getMonth();
+  if (today.getDate() < startDate.getDate()) months -= 1;
+  return Math.max(0, months);
+};
+
+const formatAssetUsageDuration = (months: number) => `${Math.floor(months / 12)} ปี ${months % 12} เดือน`;
 
 const emptyForm: TicketForm = { storeName: '', category: '', description: '', assignee: '', status: 'Pending', attachments: [] };
 const defaultUserPermissions = (): UserPermission => ({
@@ -407,7 +425,7 @@ function App() {
     setAssetModal(asset ?? 'new');
   };
 
-  const saveAsset = (event: FormEvent) => {
+  const saveAsset = async (event: FormEvent) => {
     event.preventDefault();
     if (!assetForm.assetName || !assetForm.category || !assetForm.location) return;
 
@@ -421,54 +439,39 @@ function App() {
       return;
     }
 
-    if (assetModal && assetModal !== 'new') {
-      setAssets((current) =>
-        current.map((asset) =>
-          asset.id === assetModal.id
-            ? {
-                ...asset,
-                assetName: assetForm.assetName ?? asset.assetName,
-                category: assetForm.category ?? asset.category,
-                serialNumber: assetForm.serialNumber ?? asset.serialNumber,
-                location: assetForm.location ?? asset.location,
-                owner: currentUserName,
-                status: (assetForm.status as AssetStatus) ?? asset.status,
-                purchaseDate: assetForm.purchaseDate ?? asset.purchaseDate,
-                installationDate: assetForm.installationDate ?? asset.installationDate,
-                vendor: assetForm.vendor ?? asset.vendor,
-                priceBeforeVat: assetForm.priceBeforeVat ?? asset.priceBeforeVat,
-                priceBeforeVatUsd: (assetForm.priceBeforeVat ?? asset.priceBeforeVat ?? 0) / usdExchangeRate,
-                remark: assetForm.remark ?? asset.remark,
-                replacementAvailability: assetForm.status === 'Maintenance' ? assetForm.replacementAvailability : undefined,
-                replacementDetails: assetForm.status === 'Maintenance' && assetForm.replacementAvailability === 'yes' ? assetForm.replacementDetails : '',
-              }
-            : asset,
-        ),
-      );
-    } else {
-      const nextId = `201-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(assets.length + 1).padStart(3, '0')}`;
-      setAssets((current) => [
-        {
-          id: nextId,
-          assetName: assetForm.assetName ?? '',
-          category: assetForm.category ?? '',
-          serialNumber: assetForm.serialNumber ?? '',
-          location: assetForm.location ?? '',
-          owner: currentUserName,
-          status: (assetForm.status as AssetStatus) ?? 'In Use',
-          purchaseDate: assetForm.purchaseDate ?? new Date().toISOString().slice(0, 10),
-          installationDate: assetForm.installationDate ?? assetForm.purchaseDate ?? new Date().toISOString().slice(0, 10),
-          vendor: assetForm.vendor ?? '',
-          remark: assetForm.remark ?? '',
-          priceBeforeVat: assetForm.priceBeforeVat ?? 0,
-          priceBeforeVatUsd: (assetForm.priceBeforeVat ?? 0) / usdExchangeRate,
-          replacementAvailability: assetForm.status === 'Maintenance' ? assetForm.replacementAvailability : undefined,
-          replacementDetails: assetForm.status === 'Maintenance' && assetForm.replacementAvailability === 'yes' ? assetForm.replacementDetails : '',
-        },
-        ...current,
-      ]);
+    const assetData = {
+      ...assetForm,
+      serialNumber: serialNumber ?? '',
+      owner: currentUserName,
+      status: (assetForm.status as AssetStatus) ?? 'In Use',
+      purchaseDate: assetForm.purchaseDate ?? '',
+      priceBeforeVatUsd: (assetForm.priceBeforeVat ?? 0) / usdExchangeRate,
+      replacementAvailability: assetForm.status === 'Maintenance' ? assetForm.replacementAvailability : undefined,
+      replacementDetails: assetForm.status === 'Maintenance' && assetForm.replacementAvailability === 'yes' ? assetForm.replacementDetails : '',
+    };
+
+    try {
+      if (assetModal && assetModal !== 'new') {
+        await request(`/api/assets/${assetModal.id}`, { method: 'PATCH', body: JSON.stringify(assetData) });
+      } else {
+        await request('/api/assets', { method: 'POST', body: JSON.stringify(assetData) });
+      }
+      setAssetModal(null);
+      await loadAssets();
+    } catch (saveError) {
+      setError((saveError as Error).message);
     }
-    setAssetModal(null);
+  };
+
+  const deleteAsset = async (asset: Asset) => {
+    if (!window.confirm(`ต้องการลบอุปกรณ์ ${asset.assetName} ใช่หรือไม่?`)) return;
+
+    try {
+      await request(`/api/assets/${asset.id}`, { method: 'DELETE' });
+      await loadAssets();
+    } catch (deleteError) {
+      setError((deleteError as Error).message);
+    }
   };
 
   const openUserForm = (user?: User) => {
@@ -658,7 +661,7 @@ function App() {
           </>
         )}
 
-        {view === 'assets' && <AssetView assets={assets} onAdd={() => openAssetForm()} onEdit={(asset) => openAssetForm(asset)} />}
+        {view === 'assets' && <AssetView assets={assets} onAdd={() => openAssetForm()} onEdit={(asset) => openAssetForm(asset)} onDelete={(asset) => void deleteAsset(asset)} />}
 
         {view === 'reports' && <Reports tickets={reportTickets} years={reportYears} period={reportPeriod} startDate={reportStartDate} endDate={reportEndDate} month={reportMonth} year={reportYear} onPeriodChange={setReportPeriod} onStartDateChange={setReportStartDate} onEndDateChange={setReportEndDate} onMonthChange={setReportMonth} onYearChange={setReportYear} onExport={exportCsv} />}
 
@@ -727,6 +730,8 @@ function App() {
 }
 
 function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket[]; assets: Asset[]; users: User[]; masterData: MasterData }) {
+  const [assetAgePage, setAssetAgePage] = useState(1);
+  const [assetAgeQuery, setAssetAgeQuery] = useState('');
   const totalTickets = tickets.length;
   const pending = tickets.filter((ticket) => !ticket.approval).length;
   const inProgress = tickets.filter((ticket) => ticket.status === 'In Progress').length;
@@ -772,16 +777,29 @@ function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket
   ).sort(([, first], [, second]) => second.total - first.total);
   const locationsByIdentity = new Map(masterData.locations.map((location) => [locationIdentity(location), location]));
   const branchSpend = Object.values(
-    assets.reduce<Record<string, { location: LocationMasterItem; assetCount: number; spent: number }>>((result, asset) => {
+    assets.reduce<Record<string, { location: LocationMasterItem; assetCount: number; spent: number; spentUsd: number }>>((result, asset) => {
       const identity = locationIdentity(asset.location);
       const location = locationsByIdentity.get(identity) ?? normalizeLocationEntry(asset.location);
-      const current = result[identity] ?? { location, assetCount: 0, spent: 0 };
+      const current = result[identity] ?? { location, assetCount: 0, spent: 0, spentUsd: 0 };
       current.assetCount += 1;
       current.spent += asset.priceBeforeVat ?? 0;
+      current.spentUsd += asset.priceBeforeVatUsd ?? (asset.priceBeforeVat ?? 0) / usdExchangeRate;
       result[identity] = current;
       return result;
     }, {}),
   ).sort((first, second) => second.spent - first.spent);
+  const fourYearAssets = assets
+    .map((asset) => ({ asset, usageMonths: getAssetUsageMonths(asset) }))
+    .filter((item): item is { asset: Asset; usageMonths: number } => item.usageMonths !== null && item.usageMonths >= 48)
+    .sort((first, second) => second.usageMonths - first.usageMonths);
+  const normalizedAssetAgeQuery = assetAgeQuery.trim().toLowerCase();
+  const filteredFourYearAssets = normalizedAssetAgeQuery
+    ? fourYearAssets.filter(({ asset }) => [asset.id, asset.assetName, asset.category, asset.serialNumber, asset.location].some((value) => value.toLowerCase().includes(normalizedAssetAgeQuery)))
+    : fourYearAssets;
+  const assetAgePageSize = 10;
+  const assetAgePageCount = Math.max(1, Math.ceil(filteredFourYearAssets.length / assetAgePageSize));
+  const activeAssetAgePage = Math.min(assetAgePage, assetAgePageCount);
+  const visibleFourYearAssets = filteredFourYearAssets.slice((activeAssetAgePage - 1) * assetAgePageSize, activeAssetAgePage * assetAgePageSize);
 
   return (
     <>
@@ -837,17 +855,68 @@ function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket
       </section>
 
       <section className="dashboard-panels">
+        <div className="panel asset-age-panel">
+          <div className="panel-head">
+            <h2>อุปกรณ์ใช้งานครบ 4 ปีขึ้นไป</h2>
+            <span className="panel-total">{filteredFourYearAssets.length} เครื่อง</span>
+          </div>
+          <div className="filters asset-age-filters">
+            <label className="search">
+              <Search size={16} />
+              <input value={assetAgeQuery} onChange={(event) => { setAssetAgeQuery(event.target.value); setAssetAgePage(1); }} placeholder="ค้นหา ID, อุปกรณ์, Serial หรือสาขา" />
+            </label>
+          </div>
+          <div className="table-wrap">
+            <table className="dashboard-table asset-age-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>ชื่อ</th>
+                  <th>สาขา</th>
+                  <th>เริ่มใช้</th>
+                  <th>อายุ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleFourYearAssets.length ? visibleFourYearAssets.map(({ asset, usageMonths }) => {
+                  const location = normalizeLocationEntry(asset.location);
+                  const branchName = location.shortName ? `${location.id} - ${location.shortName}` : asset.location;
+                  return (
+                    <tr key={asset.id}>
+                      <td><b className="ticket-id">{asset.id}</b></td>
+                      <td>{asset.assetName}</td>
+                      <td>{branchName}</td>
+                      <td>{new Date(`${asset.installationDate || asset.purchaseDate}T00:00:00`).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })}</td>
+                      <td><b className="asset-age-value">{formatAssetUsageDuration(usageMonths)}</b></td>
+                    </tr>
+                  );
+                }) : (
+                  <tr><td className="empty-location-row" colSpan={5}>{fourYearAssets.length ? 'ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา' : 'ยังไม่มีอุปกรณ์ที่ใช้งานครบ 4 ปี'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {filteredFourYearAssets.length > assetAgePageSize && (
+            <div className="table-pagination">
+              <button type="button" className="icon-button" aria-label="หน้าก่อนหน้า" title="หน้าก่อนหน้า" disabled={activeAssetAgePage === 1} onClick={() => setAssetAgePage(activeAssetAgePage - 1)}><ChevronLeft size={16} /></button>
+              <span>หน้า {activeAssetAgePage} จาก {assetAgePageCount}</span>
+              <button type="button" className="icon-button" aria-label="หน้าถัดไป" title="หน้าถัดไป" disabled={activeAssetAgePage === assetAgePageCount} onClick={() => setAssetAgePage(activeAssetAgePage + 1)}><ChevronRight size={16} /></button>
+            </div>
+          )}
+        </div>
+
         <div className="panel branch-budget-panel">
           <div className="panel-head">
             <h2>ยอดใช้จ่ายรายสาขา</h2>
             <span className="panel-total">THB</span>
           </div>
           <div className="branch-budget-list">
-            {branchSpend.length ? branchSpend.map(({ location, assetCount, spent }) => (
+            {branchSpend.length ? branchSpend.map(({ location, assetCount, spent, spentUsd }) => (
               <div className="branch-budget" key={`${location.id}-${location.shortName}`}>
                 <strong>{formatLocationLabel(location)}</strong>
                 <span>จำนวนอุปกรณ์ {assetCount} เครื่อง</span>
                 <b className="branch-spending">ใช้จ่ายรวม {spent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB</b>
+                <b className="branch-spending-usd">ใช้จ่ายรวม ${spentUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</b>
               </div>
             )) : (
               <p className="empty-state">ยังไม่มีข้อมูลราคาอุปกรณ์</p>
@@ -934,8 +1003,13 @@ function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket
   );
 }
 
-function AssetView({ assets, onAdd, onEdit }: { assets: Asset[]; onAdd: () => void; onEdit: (asset: Asset) => void }) {
-  const groupedByLocation = assets.reduce<Record<string, Asset[]>>((result, asset) => {
+function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd: () => void; onEdit: (asset: Asset) => void; onDelete: (asset: Asset) => void }) {
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredAssets = normalizedQuery
+    ? assets.filter((asset) => [asset.id, asset.assetName, asset.category, asset.serialNumber, asset.location, asset.owner, asset.status, asset.vendor ?? ''].some((value) => value.toLowerCase().includes(normalizedQuery)))
+    : assets;
+  const groupedByLocation = filteredAssets.reduce<Record<string, Asset[]>>((result, asset) => {
     result[asset.location] = [...(result[asset.location] ?? []), asset];
     return result;
   }, {});
@@ -947,6 +1021,13 @@ function AssetView({ assets, onAdd, onEdit }: { assets: Asset[]; onAdd: () => vo
         <button className="primary" onClick={onAdd}>
           <Plus size={16} /> เพิ่มอุปกรณ์
         </button>
+      </div>
+
+      <div className="filters">
+        <label className="search">
+          <Search size={16} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา ID, อุปกรณ์, Serial, สาขา หรือผู้จำหน่าย" />
+        </label>
       </div>
 
       <div className="table-wrap">
@@ -964,7 +1045,7 @@ function AssetView({ assets, onAdd, onEdit }: { assets: Asset[]; onAdd: () => vo
             </tr>
           </thead>
           <tbody>
-            {assets.map((asset) => (
+            {filteredAssets.length ? filteredAssets.map((asset) => (
               <tr key={asset.id}>
                 <td>
                   <b className="ticket-id">{asset.id}</b>
@@ -984,11 +1065,18 @@ function AssetView({ assets, onAdd, onEdit }: { assets: Asset[]; onAdd: () => vo
                     <button className="icon-button" title="แก้ไข" onClick={() => onEdit(asset)}>
                       <Pencil size={14} />
                     </button>
-                    {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : '-'}
+                    <button className="icon-button reject" title="ลบอุปกรณ์" onClick={() => onDelete(asset)}>
+                      <Trash2 size={14} />
+                    </button>
+                    {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH-u-ca-gregory') : '-'}
                   </div>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td className="empty-location-row" colSpan={8}>ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1064,9 +1152,9 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
       <td>
         <b className="ticket-id">#{ticket.id}</b>
         <small>
-          สร้าง: {new Date(ticket.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} 
-          {ticket.createdAt && ' ' + new Date(ticket.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-          {ticket.completedAt && <><br />ปิด: {new Date(ticket.completedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</>}
+          สร้าง: {new Date(ticket.createdAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })}
+          {ticket.createdAt && ' ' + new Date(ticket.createdAt).toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit' })}
+          {ticket.completedAt && <><br />ปิด: {new Date(ticket.completedAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit' })}</>}
           {ticket.attachments && ticket.attachments.length > 0 && <><br /><span className="attachment-indicator">📎 {ticket.attachments.length} ไฟล์</span></>}
         </small>
       </td>
@@ -1758,7 +1846,7 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
   const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
   const firstDay = new Date(displayYear, displayMonth, 1).getDay();
   const selectedDay = value && selectedDate.getFullYear() === displayYear && selectedDate.getMonth() === displayMonth ? selectedDate.getDate() : 0;
-  const formattedDate = value ? selectedDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: '2-digit' }) : 'เลือกวันเดือนปี';
+  const formattedDate = value ? selectedDate.toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' }) : 'เลือกวันเดือนปี';
 
   const selectDay = (day: number) => {
     onChange(`${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
@@ -1911,8 +1999,8 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
               {tickets.length ? tickets.map((ticket) => (
                 <tr key={ticket.id}>
                   <td><b className="ticket-id">#{ticket.id}</b></td>
-                  <td>{new Date(ticket.createdAt).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td>{ticket.completedAt ? new Date(ticket.completedAt).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                  <td>{new Date(ticket.createdAt).toLocaleString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td>{ticket.completedAt ? new Date(ticket.completedAt).toLocaleString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                   <td>{formatResolutionDuration(ticket.createdAt, ticket.completedAt)}</td>
                   <td>{ticket.storeName}</td>
                   <td>{ticket.category}</td>

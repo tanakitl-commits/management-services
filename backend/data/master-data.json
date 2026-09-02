@@ -73,9 +73,19 @@
   ],
   "locations": [
     {
+      "id": "101 - Fashion Island",
+      "shortName": "",
+      "fullName": "101 - Fashion Island"
+    },
+    {
       "id": "201",
       "shortName": "MGB",
       "fullName": "Mega Bangna"
+    },
+    {
+      "id": "201 - MGB - Mega Bangna",
+      "shortName": "",
+      "fullName": "201 - MGB - Mega Bangna"
     },
     {
       "id": "203",
@@ -83,9 +93,19 @@
       "fullName": "Future Park Rangsit"
     },
     {
+      "id": "203 - FPR - Future Park Rangsit",
+      "shortName": "",
+      "fullName": "203 - FPR - Future Park Rangsit"
+    },
+    {
       "id": "204",
       "shortName": "CEV",
       "fullName": "Central Eastville"
+    },
+    {
+      "id": "204 - CEV - Central Eastville",
+      "shortName": "",
+      "fullName": "204 - CEV - Central Eastville"
     },
     {
       "id": "205",
@@ -93,9 +113,19 @@
       "fullName": "Seacon Bangkae"
     },
     {
+      "id": "205 - SBK - Seacon Bangkae",
+      "shortName": "",
+      "fullName": "205 - SBK - Seacon Bangkae"
+    },
+    {
       "id": "206",
       "shortName": "SSQ",
       "fullName": "Seacon Square"
+    },
+    {
+      "id": "206 - SSQ - Seacon Square",
+      "shortName": "",
+      "fullName": "206 - SSQ - Seacon Square"
     },
     {
       "id": "209",
@@ -106,6 +136,11 @@
       "id": "210",
       "shortName": "MKR",
       "fullName": "The Mall Korat"
+    },
+    {
+      "id": "210 - MKR - The Mall Korat",
+      "shortName": "",
+      "fullName": "210 - MKR - The Mall Korat"
     },
     {
       "id": "214",

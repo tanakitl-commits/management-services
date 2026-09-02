@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
@@ -35,6 +35,23 @@ const ticketInputSchema = z.object({
   attachments: z.array(attachmentSchema).optional(),
 });
 const ticketPatchSchema = ticketInputSchema.partial();
+const assetInputSchema = z.object({
+  assetName: z.string().trim().min(1).max(160),
+  category: z.string().trim().min(1).max(80),
+  serialNumber: z.string().trim().max(160).default(''),
+  location: z.string().trim().min(1).max(200),
+  owner: z.string().trim().min(1).max(120),
+  status: z.enum(['In Use', 'Available', 'Maintenance']),
+  purchaseDate: z.string().trim().max(20).default(''),
+  installationDate: z.string().trim().max(20).optional(),
+  vendor: z.string().trim().max(160).optional(),
+  priceBeforeVat: z.number().finite().min(0).optional(),
+  priceBeforeVatUsd: z.number().finite().min(0).optional(),
+  remark: z.string().max(2000).optional(),
+  replacementAvailability: z.enum(['yes', 'no']).optional(),
+  replacementDetails: z.string().max(1000).optional(),
+});
+const assetPatchSchema = assetInputSchema.partial();
 const userInputSchema = z.object({
   staffId: z.string().trim().min(1).max(20),
   name: z.string().trim().min(1).max(120),
@@ -71,7 +88,10 @@ type Asset = {
   installationDate?: string;
   vendor?: string;
   priceBeforeVat?: number;
+  priceBeforeVatUsd?: number;
   remark?: string;
+  replacementAvailability?: 'yes' | 'no';
+  replacementDetails?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -151,10 +171,26 @@ async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
   try {
     return JSON.parse(await readFile(filePath, 'utf8')) as T;
   } catch {
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, JSON.stringify(fallback, null, 2));
+    await writeJsonFile(filePath, fallback);
     return fallback;
   }
+}
+
+async function writeJsonFile<T>(filePath: string, data: T) {
+  const dataDirectory = dirname(filePath);
+  const backupDirectory = join(dataDirectory, 'backups');
+  const backupFile = join(backupDirectory, basename(filePath));
+  const temporaryFile = `${filePath}.tmp`;
+
+  await mkdir(dataDirectory, { recursive: true });
+  await mkdir(backupDirectory, { recursive: true });
+  try {
+    await copyFile(filePath, backupFile);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  await writeFile(temporaryFile, JSON.stringify(data, null, 2));
+  await rename(temporaryFile, filePath);
 }
 
 async function readTickets(): Promise<Ticket[]> {
@@ -162,11 +198,15 @@ async function readTickets(): Promise<Ticket[]> {
 }
 
 async function saveTickets(tickets: Ticket[]) {
-  await writeFile(dataFile, JSON.stringify(tickets, null, 2));
+  await writeJsonFile(dataFile, tickets);
 }
 
 async function readAssets(): Promise<Asset[]> {
   return readJsonFile<Asset[]>(assetsFile, []);
+}
+
+async function saveAssets(assets: Asset[]) {
+  await writeJsonFile(assetsFile, assets);
 }
 
 async function readUsers(): Promise<User[]> {
@@ -174,7 +214,7 @@ async function readUsers(): Promise<User[]> {
 }
 
 async function saveUsers(users: User[]) {
-  await writeFile(usersFile, JSON.stringify(users, null, 2));
+  await writeJsonFile(usersFile, users);
 }
 
 async function readMasterData(): Promise<MasterData> {
@@ -200,7 +240,7 @@ async function readMasterData(): Promise<MasterData> {
   };
 
   if (JSON.stringify(merged) !== JSON.stringify(storedData)) {
-    await writeFile(masterDataFile, JSON.stringify(merged, null, 2));
+    await writeJsonFile(masterDataFile, merged);
   }
 
   return merged;
@@ -237,6 +277,68 @@ app.get('/api/assets', async (_req, res, next) => {
   try {
     const assets = await readAssets();
     res.json(assets);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/assets', async (req, res, next) => {
+  try {
+    const input = assetInputSchema.parse(req.body);
+    const assets = await readAssets();
+    const serialNumber = input.serialNumber.toLowerCase();
+    if (serialNumber && assets.some((asset) => asset.serialNumber.trim().toLowerCase() === serialNumber)) {
+      return res.status(409).json({ message: 'Serial Number นี้มีอยู่ในระบบแล้ว' });
+    }
+
+    const now = new Date().toISOString();
+    const datePart = now.slice(0, 10).replaceAll('-', '');
+    const asset: Asset = {
+      ...input,
+      id: `AS-${datePart}-${String(assets.length + 1).padStart(4, '0')}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    assets.unshift(asset);
+    await saveAssets(assets);
+    res.status(201).json(asset);
+  } catch (error) {
+    if (error instanceof z.ZodError) return sendValidationError(res, error);
+    next(error);
+  }
+});
+
+app.patch('/api/assets/:id', async (req, res, next) => {
+  try {
+    const patch = assetPatchSchema.parse(req.body);
+    const assets = await readAssets();
+    const index = assets.findIndex((asset) => asset.id === req.params.id);
+    if (index === -1) return res.status(404).json({ message: 'ไม่พบอุปกรณ์' });
+
+    const serialNumber = patch.serialNumber?.toLowerCase();
+    if (serialNumber && assets.some((asset) => asset.id !== req.params.id && asset.serialNumber.trim().toLowerCase() === serialNumber)) {
+      return res.status(409).json({ message: 'Serial Number นี้มีอยู่ในระบบแล้ว' });
+    }
+
+    const asset = { ...assets[index], ...patch, updatedAt: new Date().toISOString() };
+    assets[index] = asset;
+    await saveAssets(assets);
+    res.json(asset);
+  } catch (error) {
+    if (error instanceof z.ZodError) return sendValidationError(res, error);
+    next(error);
+  }
+});
+
+app.delete('/api/assets/:id', async (req, res, next) => {
+  try {
+    const assets = await readAssets();
+    const index = assets.findIndex((asset) => asset.id === req.params.id);
+    if (index === -1) return res.status(404).json({ message: 'ไม่พบอุปกรณ์' });
+
+    const [deletedAsset] = assets.splice(index, 1);
+    await saveAssets(assets);
+    res.json(deletedAsset);
   } catch (error) {
     next(error);
   }
@@ -350,7 +452,7 @@ app.put('/api/master-data', async (req, res, next) => {
       locations: [...uniqueLocations.values()].sort((a, b) => `${a.id} ${a.shortName} ${a.fullName}`.localeCompare(`${b.id} ${b.shortName} ${b.fullName}`, 'th', { sensitivity: 'base' })),
     };
 
-    await writeFile(masterDataFile, JSON.stringify(masterData, null, 2));
+    await writeJsonFile(masterDataFile, masterData);
     res.json(masterData);
   } catch (error) {
     if (error instanceof z.ZodError) return sendValidationError(res, error);

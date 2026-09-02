@@ -972,6 +972,10 @@ small {
   color: #b3463d;
 }
 
+.icon-button.reject:hover {
+  background: #f8d9d6;
+}
+
 .alert {
   display: flex;
   align-items: center;
@@ -1266,6 +1270,38 @@ input[type='date'] {
   grid-column: 1 / -1;
 }
 
+.asset-age-panel {
+  grid-column: 1 / -1;
+}
+
+.asset-age-table {
+  min-width: 700px;
+}
+
+.asset-age-filters {
+  margin-bottom: 14px;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  color: #71808a;
+  font-size: 12px;
+}
+
+.table-pagination .icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.asset-age-value {
+  color: #b2771d;
+  white-space: nowrap;
+}
+
 .branch-budget-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1296,6 +1332,10 @@ input[type='date'] {
 
 .branch-budget b.branch-spending {
   color: #1a6378;
+}
+
+.branch-budget b.branch-spending-usd {
+  color: #347477;
 }
 
 .branch-budget b.over-budget {
