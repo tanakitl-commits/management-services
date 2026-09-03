@@ -23,6 +23,7 @@ import './styles.css';
 type Status = 'Pending' | 'In Progress' | 'Completed' | 'Rejected';
 type View = 'dashboard' | 'tickets' | 'reports' | 'assets' | 'admin';
 type ReportPeriod = 'range' | 'month' | 'year';
+type Language = 'th' | 'en';
 type Attachment = {
   name: string;
   type: string;
@@ -155,6 +156,11 @@ const getAssetUsageMonths = (asset: Asset) => {
 
 const formatAssetUsageDuration = (months: number) => `${Math.floor(months / 12)} ปี ${months % 12} เดือน`;
 
+const translations = {
+  th: { workspace: 'WORKSPACE', tickets: 'จัดการ Ticket', assets: 'จัดเก็บอุปกรณ์', reports: 'รายงานย้อนหลัง', admin: 'ผู้ดูแลระบบ', subtitle: 'ติดตาม แก้ไข และอนุมัติคำขอจากทุกสาขา', logout: 'ออกจากระบบ', language: 'English', dashboardReport: 'ดึงรายงาน Dashboard', downloadAll: 'ดาวน์โหลดทุกคอลัมน์', selectRange: 'เลือกช่วงวันที่', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'แสดง Ticket', assetItems: 'รายการ และ Asset', items: 'รายการตามช่วงเวลาที่เลือก', totalTickets: 'รวม Ticket', pendingApproval: 'รออนุมัติ', equipmentInUse: 'อุปกรณ์ใช้งาน', maintenance: 'ซ่อมบำรุง' },
+  en: { workspace: 'WORKSPACE', tickets: 'Ticket Management', assets: 'Asset Inventory', reports: 'Historical Reports', admin: 'Administrator', subtitle: 'Track, resolve, and approve requests from every branch', logout: 'Log out', language: 'ไทย', dashboardReport: 'Dashboard Report', downloadAll: 'Download all columns', selectRange: 'Date range', selectMonth: 'Month', selectYear: 'Year', from: 'From', to: 'To', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'Showing', assetItems: 'tickets and', items: 'assets for the selected period', totalTickets: 'Total Tickets', pendingApproval: 'Pending Approval', equipmentInUse: 'Assets In Use', maintenance: 'Maintenance' },
+} as const;
+
 const emptyForm: TicketForm = { storeName: '', category: '', description: '', assignee: '', status: 'Pending', attachments: [] };
 const defaultUserPermissions = (): UserPermission => ({
   dashboard: true,
@@ -200,6 +206,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [language, setLanguage] = useState<Language>(() => (localStorage.getItem('app-language') as Language) || 'th');
   const [currentStaffId, setCurrentStaffId] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -214,6 +221,11 @@ function App() {
   const [reportEndDate, setReportEndDate] = useState('');
   const [reportMonth, setReportMonth] = useState('');
   const [reportYear, setReportYear] = useState('');
+  const [dashboardPeriod, setDashboardPeriod] = useState<ReportPeriod>('range');
+  const [dashboardStartDate, setDashboardStartDate] = useState('');
+  const [dashboardEndDate, setDashboardEndDate] = useState('');
+  const [dashboardMonth, setDashboardMonth] = useState('');
+  const [dashboardYear, setDashboardYear] = useState('');
   const [modal, setModal] = useState<Ticket | 'new' | null>(null);
   const [assetModal, setAssetModal] = useState<Asset | 'new' | null>(null);
   const [userModal, setUserModal] = useState<User | 'new' | null>(null);
@@ -238,6 +250,12 @@ function App() {
   });
   const [error, setError] = useState('');
   const currentUserName = users.find((user) => user.staffId === currentStaffId)?.name ?? currentStaffId;
+  const t = translations[language];
+  const toggleLanguage = () => {
+    const nextLanguage = language === 'th' ? 'en' : 'th';
+    setLanguage(nextLanguage);
+    localStorage.setItem('app-language', nextLanguage);
+  };
 
   async function loadTickets() {
     try {
@@ -385,6 +403,35 @@ function App() {
     if (reportPeriod === 'year') return !reportYear || ticket.createdAt.slice(0, 4) === reportYear;
     return (!reportStartDate || ticketDate >= reportStartDate) && (!reportEndDate || ticketDate <= reportEndDate);
   });
+
+  const dashboardYears = [...new Set([
+    ...tickets.map((ticket) => ticket.createdAt.slice(0, 4)),
+    ...assets.flatMap((asset) => [asset.installationDate, asset.purchaseDate]).filter((date): date is string => !!date).map((date) => date.slice(0, 4)),
+    String(new Date().getFullYear()),
+  ])].sort((a, b) => Number(b) - Number(a));
+  const isDashboardDateInPeriod = (date: string) => {
+    const datePart = date.slice(0, 10);
+    if (dashboardPeriod === 'month') return (!dashboardMonth || date.slice(5, 7) === dashboardMonth) && (!dashboardYear || date.slice(0, 4) === dashboardYear);
+    if (dashboardPeriod === 'year') return !dashboardYear || date.slice(0, 4) === dashboardYear;
+    return (!dashboardStartDate || datePart >= dashboardStartDate) && (!dashboardEndDate || datePart <= dashboardEndDate);
+  };
+  const dashboardTickets = tickets.filter((ticket) => isDashboardDateInPeriod(ticket.createdAt));
+  const dashboardAssets = assets.filter((asset) => {
+    const date = asset.installationDate || asset.purchaseDate;
+    return date ? isDashboardDateInPeriod(date) : (!dashboardStartDate && !dashboardEndDate && !dashboardMonth && !dashboardYear);
+  });
+
+  const exportDashboardCsv = () => {
+    const rows = [
+      ['Type', 'ID', 'Created/Purchase Date', 'Completed/Installation Date', 'Store/Location', 'Category/Asset Type', 'Description/Asset Name', 'Assignee/Owner', 'Status', 'Approval/Vendor', 'Serial Number', 'Price Before VAT (THB)', 'Price Before VAT (USD)', 'Resolution Time'],
+      ...dashboardTickets.map((ticket) => ['Ticket', ticket.id, ticket.createdAt, ticket.completedAt || '-', ticket.storeName, ticket.category, ticket.description, users.find((user) => user.staffId === ticket.assignee)?.name ?? ticket.assignee, ticket.status, ticket.approval || '-', '-', '-', '-', formatResolutionDuration(ticket.createdAt, ticket.completedAt)]),
+      ...dashboardAssets.map((asset) => ['Asset', asset.id, asset.purchaseDate || '-', asset.installationDate || '-', asset.location, asset.category, asset.assetName, asset.owner, asset.status, asset.vendor || '-', asset.serialNumber || '-', asset.priceBeforeVat ?? 0, asset.priceBeforeVatUsd ?? (asset.priceBeforeVat ?? 0) / usdExchangeRate, '-']),
+    ].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' }));
+    link.download = 'dashboard-report.csv';
+    link.click();
+  };
 
   const exportCsv = () => {
     const csv = [
@@ -542,22 +589,22 @@ function App() {
             CONTROL
           </b>
         </div>
-        <small className="nav-label">WORKSPACE</small>
+        <small className="nav-label">{t.workspace}</small>
         <nav>
           <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>
             <LayoutDashboard size={17} /> Dashboard
           </button>
           <button className={view === 'tickets' ? 'active' : ''} onClick={() => setView('tickets')}>
-            <ClipboardList size={17} /> จัดการ Ticket
+            <ClipboardList size={17} /> {t.tickets}
           </button>
           <button className={view === 'assets' ? 'active' : ''} onClick={() => setView('assets')}>
-            <Warehouse size={17} /> จัดเก็บอุปกรณ์
+            <Warehouse size={17} /> {t.assets}
           </button>
           <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
-            <BarChart3 size={17} /> รายงานย้อนหลัง
+            <BarChart3 size={17} /> {t.reports}
           </button>
           <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}>
-            <Monitor size={17} /> ผู้ดูแลระบบ
+            <Monitor size={17} /> {t.admin}
           </button>
         </nav>
         <div className="side-note">
@@ -572,18 +619,21 @@ function App() {
           <div>
             <h1>
               {view === 'dashboard' && 'Dashboard'}
-              {view === 'tickets' && 'จัดการ Ticket'}
-              {view === 'assets' && 'จัดเก็บอุปกรณ์'}
-              {view === 'reports' && 'รายงานย้อนหลัง'}
-              {view === 'admin' && 'ผู้ดูแลระบบ'}
+              {view === 'tickets' && t.tickets}
+              {view === 'assets' && t.assets}
+              {view === 'reports' && t.reports}
+              {view === 'admin' && t.admin}
             </h1>
-            <p>ติดตาม แก้ไข และอนุมัติคำขอจากทุกสาขา</p>
+            <p>{t.subtitle}</p>
           </div>
           <div className="user">
             <span className="avatar">TL</span>
             <span>Tanakit Lertmana</span>
+            <button className="ghost language-toggle" onClick={toggleLanguage} title="Change language">
+              {t.language}
+            </button>
             <button className="ghost" onClick={() => setLoggedIn(false)}>
-              <LogOut size={15} /> ออกจากระบบ
+              <LogOut size={15} /> {t.logout}
             </button>
           </div>
         </header>
@@ -597,7 +647,7 @@ function App() {
           </div>
         )}
 
-        {view === 'dashboard' && <DashboardView tickets={tickets} assets={assets} users={users} masterData={masterData} />}
+        {view === 'dashboard' && <DashboardView tickets={dashboardTickets} assets={dashboardAssets} users={users} masterData={masterData} language={language} period={dashboardPeriod} startDate={dashboardStartDate} endDate={dashboardEndDate} month={dashboardMonth} year={dashboardYear} years={dashboardYears} onPeriodChange={setDashboardPeriod} onStartDateChange={setDashboardStartDate} onEndDateChange={setDashboardEndDate} onMonthChange={setDashboardMonth} onYearChange={setDashboardYear} onExport={exportDashboardCsv} />}
 
         {view === 'tickets' && (
           <>
@@ -729,7 +779,8 @@ function App() {
   );
 }
 
-function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket[]; assets: Asset[]; users: User[]; masterData: MasterData }) {
+function DashboardView({ tickets, assets, users, masterData, language, period, startDate, endDate, month, year, years, onPeriodChange, onStartDateChange, onEndDateChange, onMonthChange, onYearChange, onExport }: { tickets: Ticket[]; assets: Asset[]; users: User[]; masterData: MasterData; language: Language; period: ReportPeriod; startDate: string; endDate: string; month: string; year: string; years: string[]; onPeriodChange: (period: ReportPeriod) => void; onStartDateChange: (date: string) => void; onEndDateChange: (date: string) => void; onMonthChange: (month: string) => void; onYearChange: (year: string) => void; onExport: () => void }) {
+  const t = translations[language];
   const [assetAgePage, setAssetAgePage] = useState(1);
   const [assetAgeQuery, setAssetAgeQuery] = useState('');
   const totalTickets = tickets.length;
@@ -803,6 +854,24 @@ function DashboardView({ tickets, assets, users, masterData }: { tickets: Ticket
 
   return (
     <>
+      <section className="panel dashboard-report-filters">
+        <div className="panel-head">
+          <h2>{t.dashboardReport}</h2>
+          <button className="ghost" onClick={onExport}><Download size={15} /> {t.downloadAll}</button>
+        </div>
+        <div className="filters report-filters">
+          <select value={period} onChange={(event) => onPeriodChange(event.target.value as ReportPeriod)} aria-label="รูปแบบช่วงเวลา Dashboard">
+            <option value="range">{t.selectRange}</option>
+            <option value="month">{t.selectMonth}</option>
+            <option value="year">{t.selectYear}</option>
+          </select>
+          {period === 'range' && <><label className="date-filter">{t.from}<input type="date" value={startDate} max={endDate || undefined} onChange={(event) => onStartDateChange(event.target.value)} /></label><label className="date-filter">{t.to}<input type="date" value={endDate} min={startDate || undefined} onChange={(event) => onEndDateChange(event.target.value)} /></label></>}
+          {period === 'month' && <><label className="date-filter">Month<select value={month} onChange={(event) => onMonthChange(event.target.value)}><option value="">All months</option>{[['01', 'January'], ['02', 'February'], ['03', 'March'], ['04', 'April'], ['05', 'May'], ['06', 'June'], ['07', 'July'], ['08', 'August'], ['09', 'September'], ['10', 'October'], ['11', 'November'], ['12', 'December']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="date-filter">Year<select value={year} onChange={(event) => onYearChange(event.target.value)}><option value="">All years</option>{years.map((optionYear) => <option key={optionYear} value={optionYear}>{optionYear}</option>)}</select></label></>}
+          {period === 'year' && <label className="date-filter">Year<select value={year} onChange={(event) => onYearChange(event.target.value)}><option value="">All years</option>{years.map((optionYear) => <option key={optionYear} value={optionYear}>{optionYear}</option>)}</select></label>}
+        </div>
+        <span className="report-count">{t.showing} {tickets.length} {t.assetItems} {assets.length} {t.items}</span>
+      </section>
+
       <section className="stats">
         <Stat label="รวม Ticket" value={totalTickets} note="รายการ" />
         <Stat label="รออนุมัติ" value={pending} note="ต้องตรวจสอบ" />

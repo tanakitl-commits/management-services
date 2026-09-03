@@ -73,11 +73,6 @@
   ],
   "locations": [
     {
-      "id": "101 - Fashion Island",
-      "shortName": "",
-      "fullName": "101 - Fashion Island"
-    },
-    {
       "id": "201",
       "shortName": "MGB",
       "fullName": "Mega Bangna"
@@ -133,6 +128,11 @@
       "fullName": "Fashion Island"
     },
     {
+      "id": "209 - FHI - Fashion Island",
+      "shortName": "",
+      "fullName": "209 - FHI - Fashion Island"
+    },
+    {
       "id": "210",
       "shortName": "MKR",
       "fullName": "The Mall Korat"
@@ -146,6 +146,11 @@
       "id": "214",
       "shortName": "CUD",
       "fullName": "Central Udonthani"
+    },
+    {
+      "id": "214 - CUD - Central Udonthani",
+      "shortName": "",
+      "fullName": "214 - CUD - Central Udonthani"
     },
     {
       "id": "215",
@@ -491,6 +496,16 @@
       "id": "7221",
       "shortName": "SLM",
       "fullName": "Silom Road"
+    },
+    {
+      "id": "73",
+      "shortName": "สำนักงานใหญ่",
+      "fullName": "Thailand Office"
+    },
+    {
+      "id": "HQ",
+      "shortName": "HQ",
+      "fullName": "สำนักงานใหญ่ (Head Office)"
     }
   ]
 }

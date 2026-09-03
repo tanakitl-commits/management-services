@@ -164,7 +164,14 @@ function normalizeLocationEntry(value: string | LocationMasterItem | null | unde
 }
 
 function locationKey(location: LocationMasterItem) {
-  return `${location.id ?? ''}|${location.shortName ?? ''}|${location.fullName ?? ''}`.toLowerCase();
+  return (location.id ?? '').trim().toLowerCase();
+}
+
+function preferLocation(current: LocationMasterItem | undefined, next: LocationMasterItem) {
+  if (!current) return next;
+  const currentScore = Number(!!current.shortName) + Number(!!current.fullName) + Number(current.budget !== undefined);
+  const nextScore = Number(!!next.shortName) + Number(!!next.fullName) + Number(next.budget !== undefined);
+  return nextScore > currentScore ? next : current;
 }
 
 async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
@@ -230,7 +237,9 @@ async function readMasterData(): Promise<MasterData> {
 
   const uniqueLocations = new Map<string, LocationMasterItem>();
   [...storedData.locations, ...assets.map((asset) => normalizeLocationEntry(asset.location)).filter((entry): entry is LocationMasterItem => !!entry)]
-    .forEach((location) => uniqueLocations.set(locationKey(location), location));
+    .forEach((location) => uniqueLocations.set(locationKey(location), preferLocation(uniqueLocations.get(locationKey(location)), location)));
+  const headquarters: LocationMasterItem = { id: 'HQ', shortName: 'HQ', fullName: 'สำนักงานใหญ่ (Head Office)' };
+  uniqueLocations.set(locationKey(headquarters), preferLocation(uniqueLocations.get(locationKey(headquarters)), headquarters));
 
   const merged: MasterData = {
     categories: [...new Set(storedData.categories.map(normalizeMasterDataText))],
