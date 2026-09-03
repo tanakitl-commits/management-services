@@ -109,5 +109,34 @@
     "updatedAt": "2026-09-03T04:39:34.040Z",
     "approvedBy": "Tanakit Lertmana",
     "approvedAt": "2026-09-01T10:54:10.558Z"
+  },
+  {
+    "storeName": "222 - CWG - Central Westgate",
+    "category": "LINE REGISTER",
+    "description": "ลูกค้าลงทะเบียนไม่ได้",
+    "assignee": "7748",
+    "status": "In Progress",
+    "attachments": [],
+    "id": "IT-20260903-0001",
+    "approval": "Approved",
+    "createdAt": "2026-09-03T09:54:03.999Z",
+    "updatedAt": "2026-09-03T09:54:10.773Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-09-03T09:54:10.773Z"
+  },
+  {
+    "storeName": "225 - ICS - Iconsiam",
+    "category": "ETC.",
+    "description": "ปอแปแอปแอปแอ",
+    "assignee": "7748",
+    "status": "Completed",
+    "attachments": [],
+    "id": "IT-20260903-0002",
+    "approval": "Approved",
+    "createdAt": "2026-09-03T09:54:53.776Z",
+    "updatedAt": "2026-09-03T10:46:45.454Z",
+    "completedAt": "2026-09-03T10:46:44.446Z",
+    "approvedBy": "Tanakit Lertmana",
+    "approvedAt": "2026-09-03T10:46:45.454Z"
   }
 ]

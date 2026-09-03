@@ -111,10 +111,12 @@ const normalizeLocationEntry = (value: string | LocationMasterItem | null | unde
     return { id: value.trim(), shortName: '', fullName: value.trim() };
   }
 
+  const rawId = value.id?.trim() ?? '';
+  const embeddedLocation = rawId.match(/^([A-Za-z0-9]+)\s*[-–]\s*(.+?)\s*[-–]\s*(.+)$/);
   return {
-    id: value.id?.trim() ?? '',
-    shortName: value.shortName?.trim() ?? '',
-    fullName: value.fullName?.trim() ?? '',
+    id: embeddedLocation?.[1] ?? rawId,
+    shortName: embeddedLocation?.[2] ?? value.shortName?.trim() ?? '',
+    fullName: embeddedLocation?.[3] ?? value.fullName?.trim() ?? '',
     budget: typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0 ? value.budget : undefined,
   };
 };
@@ -129,16 +131,26 @@ const formatLocationLabel = (value: string | LocationMasterItem) => {
 
 const locationIdentity = (value: string | LocationMasterItem) => {
   const location = normalizeLocationEntry(value);
-  return `${location.id}|${location.shortName}`.toLowerCase();
+  return location.id.toLowerCase();
 };
 
-const formatResolutionDuration = (createdAt: string, completedAt?: string) => {
+const deduplicateLocations = (locations: Array<string | LocationMasterItem>) => {
+  const unique = new Map<string, LocationMasterItem>();
+  locations.map((location) => normalizeLocationEntry(location)).forEach((location) => {
+    if (location.id) unique.set(locationIdentity(location), location);
+  });
+  return [...unique.values()];
+};
+
+const formatResolutionDuration = (createdAt: string, completedAt: string | undefined, language: Language = 'th') => {
   if (!completedAt) return '-';
   const durationMinutes = Math.max(0, Math.floor((new Date(completedAt).getTime() - new Date(createdAt).getTime()) / 60000));
   const days = Math.floor(durationMinutes / 1440);
   const hours = Math.floor((durationMinutes % 1440) / 60);
   const minutes = durationMinutes % 60;
-  return [days && `${days} วัน`, hours && `${hours} ชม.`, `${minutes} นาที`].filter(Boolean).join(' ');
+  return language === 'en'
+    ? [days && `${days}d`, hours && `${hours}h`, `${minutes}m`].filter(Boolean).join(' ')
+    : [days && `${days} วัน`, hours && `${hours} ชม.`, `${minutes} นาที`].filter(Boolean).join(' ');
 };
 
 const getAssetUsageMonths = (asset: Asset) => {
@@ -154,12 +166,13 @@ const getAssetUsageMonths = (asset: Asset) => {
   return Math.max(0, months);
 };
 
-const formatAssetUsageDuration = (months: number) => `${Math.floor(months / 12)} ปี ${months % 12} เดือน`;
+const formatAssetUsageDuration = (months: number, language: Language = 'th') => language === 'en' ? `${Math.floor(months / 12)}y ${months % 12}m` : `${Math.floor(months / 12)} ปี ${months % 12} เดือน`;
 
 const translations = {
   th: { workspace: 'WORKSPACE', tickets: 'จัดการ Ticket', assets: 'จัดเก็บอุปกรณ์', reports: 'รายงานย้อนหลัง', admin: 'ผู้ดูแลระบบ', subtitle: 'ติดตาม แก้ไข และอนุมัติคำขอจากทุกสาขา', logout: 'ออกจากระบบ', language: 'English', dashboardReport: 'ดึงรายงาน Dashboard', downloadAll: 'ดาวน์โหลดทุกคอลัมน์', selectRange: 'เลือกช่วงวันที่', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'แสดง Ticket', assetItems: 'รายการ และ Asset', items: 'รายการตามช่วงเวลาที่เลือก', totalTickets: 'รวม Ticket', pendingApproval: 'รออนุมัติ', equipmentInUse: 'อุปกรณ์ใช้งาน', maintenance: 'ซ่อมบำรุง' },
   en: { workspace: 'WORKSPACE', tickets: 'Ticket Management', assets: 'Asset Inventory', reports: 'Historical Reports', admin: 'Administrator', subtitle: 'Track, resolve, and approve requests from every branch', logout: 'Log out', language: 'ไทย', dashboardReport: 'Dashboard Report', downloadAll: 'Download all columns', selectRange: 'Date range', selectMonth: 'Month', selectYear: 'Year', from: 'From', to: 'To', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'Showing', assetItems: 'tickets and', items: 'assets for the selected period', totalTickets: 'Total Tickets', pendingApproval: 'Pending Approval', equipmentInUse: 'Assets In Use', maintenance: 'Maintenance' },
 } as const;
+let activeLanguage: Language = 'th';
 
 const emptyForm: TicketForm = { storeName: '', category: '', description: '', assignee: '', status: 'Pending', attachments: [] };
 const defaultUserPermissions = (): UserPermission => ({
@@ -228,6 +241,7 @@ function App() {
   const [dashboardYear, setDashboardYear] = useState('');
   const [modal, setModal] = useState<Ticket | 'new' | null>(null);
   const [assetModal, setAssetModal] = useState<Asset | 'new' | null>(null);
+  const [assetSaving, setAssetSaving] = useState(false);
   const [userModal, setUserModal] = useState<User | 'new' | null>(null);
   const [attachmentModal, setAttachmentModal] = useState<Ticket | null>(null);
   const [form, setForm] = useState<TicketForm>(emptyForm);
@@ -251,6 +265,7 @@ function App() {
   const [error, setError] = useState('');
   const currentUserName = users.find((user) => user.staffId === currentStaffId)?.name ?? currentStaffId;
   const t = translations[language];
+  activeLanguage = language;
   const toggleLanguage = () => {
     const nextLanguage = language === 'th' ? 'en' : 'th';
     setLanguage(nextLanguage);
@@ -287,7 +302,7 @@ function App() {
       const normalized = {
         ...data,
         assetTypes: data.assetTypes ?? [],
-        locations: (data.locations ?? []).map((location) => normalizeLocationEntry(location)),
+        locations: deduplicateLocations(data.locations ?? []),
       };
       setMasterData(normalized);
     } catch (loadError) {
@@ -304,7 +319,7 @@ function App() {
       setMasterData({
         ...saved,
         assetTypes: saved.assetTypes ?? [],
-        locations: (saved.locations ?? []).map((location) => normalizeLocationEntry(location)),
+        locations: deduplicateLocations(saved.locations ?? []),
       });
     } catch (saveError) {
       setError((saveError as Error).message);
@@ -376,7 +391,7 @@ function App() {
     try {
       await request(`/api/tickets/${ticket.id}/approval`, {
         method: 'PATCH',
-        body: JSON.stringify({ decision, approvedBy: 'Tanakit Lertmana' }),
+        body: JSON.stringify({ decision, approvedBy: currentUserName, approverStaffId: currentStaffId }),
       });
       await loadTickets();
     } catch (approveError) {
@@ -482,7 +497,7 @@ function App() {
       && asset.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase(),
     );
     if (isDuplicateSerial) {
-      setError(`Serial Number ${serialNumber} มีอยู่ในระบบแล้ว`);
+      setError(activeLanguage === 'en' ? `Serial Number ${serialNumber} already exists` : `Serial Number ${serialNumber} มีอยู่ในระบบแล้ว`);
       return;
     }
 
@@ -498,6 +513,7 @@ function App() {
     };
 
     try {
+      setAssetSaving(true);
       if (assetModal && assetModal !== 'new') {
         await request(`/api/assets/${assetModal.id}`, { method: 'PATCH', body: JSON.stringify(assetData) });
       } else {
@@ -507,11 +523,13 @@ function App() {
       await loadAssets();
     } catch (saveError) {
       setError((saveError as Error).message);
+    } finally {
+      setAssetSaving(false);
     }
   };
 
   const deleteAsset = async (asset: Asset) => {
-    if (!window.confirm(`ต้องการลบอุปกรณ์ ${asset.assetName} ใช่หรือไม่?`)) return;
+    if (!window.confirm(activeLanguage === 'en' ? `Delete asset ${asset.assetName}?` : `ต้องการลบอุปกรณ์ ${asset.assetName} ใช่หรือไม่?`)) return;
 
     try {
       await request(`/api/assets/${asset.id}`, { method: 'DELETE' });
@@ -577,6 +595,7 @@ function App() {
   if (!loggedIn) return <Login onLogin={(staffId) => { setCurrentStaffId(staffId); setLoggedIn(true); }} />;
 
   const pending = tickets.filter((ticket) => !ticket.approval).length;
+  const isAdmin = users.some((user) => user.staffId === currentStaffId && user.role === 'admin');
 
   return (
     <div className="shell">
@@ -652,37 +671,37 @@ function App() {
         {view === 'tickets' && (
           <>
             <section className="stats">
-              <Stat label="ทั้งหมด" value={tickets.length} note="รายการ" />
-              <Stat label="รออนุมัติ" value={pending} note="ต้องตรวจสอบ" />
-              <Stat label="กำลังดำเนินการ" value={tickets.filter((ticket) => ticket.status === 'In Progress').length} note="รายการ" />
-              <Stat label="เสร็จสิ้น" value={tickets.filter((ticket) => ticket.status === 'Completed').length} note="รายการ" />
+              <Stat label={language === 'en' ? 'Total' : 'ทั้งหมด'} value={tickets.length} note={language === 'en' ? 'tickets' : 'รายการ'} />
+              <Stat label={language === 'en' ? 'Pending Approval' : 'รออนุมัติ'} value={pending} note={language === 'en' ? 'Needs review' : 'ต้องตรวจสอบ'} />
+              <Stat label={language === 'en' ? 'In Progress' : 'กำลังดำเนินการ'} value={tickets.filter((ticket) => ticket.status === 'In Progress').length} note={language === 'en' ? 'tickets' : 'รายการ'} />
+              <Stat label={language === 'en' ? 'Completed' : 'เสร็จสิ้น'} value={tickets.filter((ticket) => ticket.status === 'Completed').length} note={language === 'en' ? 'tickets' : 'รายการ'} />
             </section>
 
             <section className="panel">
               <div className="panel-head">
-                <h2>รายการคำขอ</h2>
+                <h2>{language === 'en' ? 'Requests' : 'รายการคำขอ'}</h2>
                 <button className="primary" onClick={() => openForm()}>
-                  <Plus size={16} /> สร้าง Ticket
+                  <Plus size={16} /> {language === 'en' ? 'Create Ticket' : 'สร้าง Ticket'}
                 </button>
               </div>
 
               <div className="filters">
                 <label className="search">
                   <Search size={16} />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา ID, สาขา หรือรายละเอียด" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={language === 'en' ? 'Search ID, branch, or description' : 'ค้นหา ID, สาขา หรือรายละเอียด'} />
                 </label>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                  <option value="">ทุกสถานะ</option>
+                  <option value="">{language === 'en' ? 'All statuses' : 'ทุกสถานะ'}</option>
                   <option>Pending</option>
                   <option>In Progress</option>
                   <option>Completed</option>
                   <option>Rejected</option>
                 </select>
                 <select value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)}>
-                  <option value="">ทุกสถานะอนุมัติ</option>
-                  <option value="pending">รอตรวจสอบ</option>
-                  <option value="Approved">อนุมัติแล้ว</option>
-                  <option value="Rejected">ไม่อนุมัติ</option>
+                  <option value="">{language === 'en' ? 'All approval statuses' : 'ทุกสถานะอนุมัติ'}</option>
+                  <option value="pending">{language === 'en' ? 'Pending review' : 'รอตรวจสอบ'}</option>
+                  <option value="Approved">{language === 'en' ? 'Approved' : 'อนุมัติแล้ว'}</option>
+                  <option value="Rejected">{language === 'en' ? 'Rejected' : 'ไม่อนุมัติ'}</option>
                 </select>
               </div>
 
@@ -691,18 +710,18 @@ function App() {
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>สาขา</th>
-                      <th>หมวดหมู่</th>
-                      <th>รายละเอียด</th>
-                      <th>ผู้รับผิดชอบ</th>
-                      <th>สถานะ</th>
-                      <th>อนุมัติ</th>
-                      <th>จัดการ</th>
+                      <th>{language === 'en' ? 'Branch' : 'สาขา'}</th>
+                      <th>{language === 'en' ? 'Category' : 'หมวดหมู่'}</th>
+                      <th>{language === 'en' ? 'Description' : 'รายละเอียด'}</th>
+                      <th>{language === 'en' ? 'Assignee' : 'ผู้รับผิดชอบ'}</th>
+                      <th>{language === 'en' ? 'Status' : 'สถานะ'}</th>
+                      <th>{language === 'en' ? 'Approval' : 'อนุมัติ'}</th>
+                      <th>{language === 'en' ? 'Actions' : 'จัดการ'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTickets.map((ticket) => (
-                      <TicketRow key={ticket.id} ticket={ticket} users={users} onEdit={() => openForm(ticket)} onApprove={(decision) => void approve(ticket, decision)} onStatusChange={(status) => void updateTicketStatus(ticket, status)} onViewAttachments={(t) => setAttachmentModal(t)} />
+                      <TicketRow key={ticket.id} ticket={ticket} users={users} language={language} isAdmin={isAdmin} onEdit={() => openForm(ticket)} onApprove={(decision) => void approve(ticket, decision)} onStatusChange={(status) => void updateTicketStatus(ticket, status)} onViewAttachments={(t) => setAttachmentModal(t)} />
                     ))}
                   </tbody>
                 </table>
@@ -711,13 +730,14 @@ function App() {
           </>
         )}
 
-        {view === 'assets' && <AssetView assets={assets} onAdd={() => openAssetForm()} onEdit={(asset) => openAssetForm(asset)} onDelete={(asset) => void deleteAsset(asset)} />}
+        {view === 'assets' && <AssetView assets={assets} language={language} onAdd={() => openAssetForm()} onEdit={(asset) => openAssetForm(asset)} onDelete={(asset) => void deleteAsset(asset)} />}
 
-        {view === 'reports' && <Reports tickets={reportTickets} years={reportYears} period={reportPeriod} startDate={reportStartDate} endDate={reportEndDate} month={reportMonth} year={reportYear} onPeriodChange={setReportPeriod} onStartDateChange={setReportStartDate} onEndDateChange={setReportEndDate} onMonthChange={setReportMonth} onYearChange={setReportYear} onExport={exportCsv} />}
+        {view === 'reports' && <Reports tickets={reportTickets} language={language} years={reportYears} period={reportPeriod} startDate={reportStartDate} endDate={reportEndDate} month={reportMonth} year={reportYear} onPeriodChange={setReportPeriod} onStartDateChange={setReportStartDate} onEndDateChange={setReportEndDate} onMonthChange={setReportMonth} onYearChange={setReportYear} onExport={exportCsv} />}
 
         {view === 'admin' && (
           <AdminView
           users={users}
+          language={language}
           masterData={masterData}
           setMasterData={(nextData) => {
             setMasterData(nextData);
@@ -756,6 +776,7 @@ function App() {
           currentUserName={currentUserName}
           assets={assets}
           editingAssetId={assetModal !== 'new' ? assetModal.id : undefined}
+          saving={assetSaving}
         />
       )}
 
@@ -873,16 +894,16 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
       </section>
 
       <section className="stats">
-        <Stat label="รวม Ticket" value={totalTickets} note="รายการ" />
-        <Stat label="รออนุมัติ" value={pending} note="ต้องตรวจสอบ" />
-        <Stat label="อุปกรณ์ใช้งาน" value={inUse} note="เครื่อง" />
-        <Stat label="ซ่อมบำรุง" value={maintenance} note="เครื่อง" />
+        <Stat label={t.totalTickets} value={totalTickets} note={language === 'en' ? 'tickets' : 'รายการ'} />
+        <Stat label={t.pendingApproval} value={pending} note={language === 'en' ? 'Needs review' : 'ต้องตรวจสอบ'} />
+        <Stat label={t.equipmentInUse} value={inUse} note={language === 'en' ? 'assets' : 'เครื่อง'} />
+        <Stat label={t.maintenance} value={maintenance} note={language === 'en' ? 'assets' : 'เครื่อง'} />
       </section>
 
       <section className="dashboard-grid">
         <div className="panel analytics-panel">
           <div className="panel-head">
-            <h2>ภาพรวมสถานะ Ticket</h2>
+            <h2>{language === 'en' ? 'Ticket Status Overview' : 'ภาพรวมสถานะ Ticket'}</h2>
           </div>
           <div className="status-bars">
             {statusCounts.map((status) => (
@@ -901,7 +922,7 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
 
         <div className="panel analytics-panel">
           <div className="panel-head">
-            <h2>ยอดใช้ตามหมวดหมู่</h2>
+            <h2>{language === 'en' ? 'Usage by Category' : 'ยอดใช้ตามหมวดหมู่'}</h2>
           </div>
           <div className="category-bars">
             {topCategories.length ? (
@@ -926,13 +947,13 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
       <section className="dashboard-panels">
         <div className="panel asset-age-panel">
           <div className="panel-head">
-            <h2>อุปกรณ์ใช้งานครบ 4 ปีขึ้นไป</h2>
+              <h2>{language === 'en' ? 'Assets in use for 4+ years' : 'อุปกรณ์ใช้งานครบ 4 ปีขึ้นไป'}</h2>
             <span className="panel-total">{filteredFourYearAssets.length} เครื่อง</span>
           </div>
           <div className="filters asset-age-filters">
             <label className="search">
               <Search size={16} />
-              <input value={assetAgeQuery} onChange={(event) => { setAssetAgeQuery(event.target.value); setAssetAgePage(1); }} placeholder="ค้นหา ID, อุปกรณ์, Serial หรือสาขา" />
+              <input value={assetAgeQuery} onChange={(event) => { setAssetAgeQuery(event.target.value); setAssetAgePage(1); }} placeholder={language === 'en' ? 'Search ID, asset, serial, or branch' : 'ค้นหา ID, อุปกรณ์, Serial หรือสาขา'} />
             </label>
           </div>
           <div className="table-wrap">
@@ -940,10 +961,10 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>ชื่อ</th>
-                  <th>สาขา</th>
-                  <th>เริ่มใช้</th>
-                  <th>อายุ</th>
+                  <th>{language === 'en' ? 'Name' : 'ชื่อ'}</th>
+                  <th>{language === 'en' ? 'Branch' : 'สาขา'}</th>
+                  <th>{language === 'en' ? 'In use since' : 'เริ่มใช้'}</th>
+                  <th>{language === 'en' ? 'Age' : 'อายุ'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -956,11 +977,11 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
                       <td>{asset.assetName}</td>
                       <td>{branchName}</td>
                       <td>{new Date(`${asset.installationDate || asset.purchaseDate}T00:00:00`).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })}</td>
-                      <td><b className="asset-age-value">{formatAssetUsageDuration(usageMonths)}</b></td>
+                      <td><b className="asset-age-value">{formatAssetUsageDuration(usageMonths, language)}</b></td>
                     </tr>
                   );
                 }) : (
-                  <tr><td className="empty-location-row" colSpan={5}>{fourYearAssets.length ? 'ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา' : 'ยังไม่มีอุปกรณ์ที่ใช้งานครบ 4 ปี'}</td></tr>
+                  <tr><td className="empty-location-row" colSpan={5}>{fourYearAssets.length ? (language === 'en' ? 'No assets match your search' : 'ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา') : (language === 'en' ? 'No assets have reached 4 years of use' : 'ยังไม่มีอุปกรณ์ที่ใช้งานครบ 4 ปี')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -968,7 +989,7 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
           {filteredFourYearAssets.length > assetAgePageSize && (
             <div className="table-pagination">
               <button type="button" className="icon-button" aria-label="หน้าก่อนหน้า" title="หน้าก่อนหน้า" disabled={activeAssetAgePage === 1} onClick={() => setAssetAgePage(activeAssetAgePage - 1)}><ChevronLeft size={16} /></button>
-              <span>หน้า {activeAssetAgePage} จาก {assetAgePageCount}</span>
+              <span>{language === 'en' ? `Page ${activeAssetAgePage} of ${assetAgePageCount}` : `หน้า ${activeAssetAgePage} จาก ${assetAgePageCount}`}</span>
               <button type="button" className="icon-button" aria-label="หน้าถัดไป" title="หน้าถัดไป" disabled={activeAssetAgePage === assetAgePageCount} onClick={() => setAssetAgePage(activeAssetAgePage + 1)}><ChevronRight size={16} /></button>
             </div>
           )}
@@ -976,52 +997,52 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
 
         <div className="panel branch-budget-panel">
           <div className="panel-head">
-            <h2>ยอดใช้จ่ายรายสาขา</h2>
+            <h2>{language === 'en' ? 'Spending by Branch' : 'ยอดใช้จ่ายรายสาขา'}</h2>
             <span className="panel-total">THB</span>
           </div>
           <div className="branch-budget-list">
             {branchSpend.length ? branchSpend.map(({ location, assetCount, spent, spentUsd }) => (
               <div className="branch-budget" key={`${location.id}-${location.shortName}`}>
                 <strong>{formatLocationLabel(location)}</strong>
-                <span>จำนวนอุปกรณ์ {assetCount} เครื่อง</span>
-                <b className="branch-spending">ใช้จ่ายรวม {spent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB</b>
-                <b className="branch-spending-usd">ใช้จ่ายรวม ${spentUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</b>
+                <span>{language === 'en' ? `${assetCount} assets` : `จำนวนอุปกรณ์ ${assetCount} เครื่อง`}</span>
+                <b className="branch-spending">{language === 'en' ? 'Total spent' : 'ใช้จ่ายรวม'} {spent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB</b>
+                <b className="branch-spending-usd">{language === 'en' ? 'Total spent' : 'ใช้จ่ายรวม'} ${spentUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</b>
               </div>
             )) : (
-              <p className="empty-state">ยังไม่มีข้อมูลราคาอุปกรณ์</p>
+              <p className="empty-state">{language === 'en' ? 'No asset price data' : 'ยังไม่มีข้อมูลราคาอุปกรณ์'}</p>
             )}
           </div>
         </div>
 
         <div className="panel">
           <div className="panel-head">
-            <h2>KPI การจัดการ Ticket</h2>
+            <h2>{language === 'en' ? 'Ticket Management KPI' : 'KPI การจัดการ Ticket'}</h2>
           </div>
           <div className="report-list">
             <p>
-              อัตราปิดงาน <b>{completionRate}%</b>
+              {language === 'en' ? 'Completion rate' : 'อัตราปิดงาน'} <b>{completionRate}%</b>
             </p>
             <p>
-              งานที่กำลังดำเนินการ <b>{openTickets}</b>
+              {language === 'en' ? 'Active tickets' : 'งานที่กำลังดำเนินการ'} <b>{openTickets}</b>
             </p>
             <p>
-              อัตราอนุมัติ <b>{approvalRate}%</b>
+              {language === 'en' ? 'Approval rate' : 'อัตราอนุมัติ'} <b>{approvalRate}%</b>
             </p>
             <p>
-              เวลาแก้ไขเฉลี่ย <b>{averageResolutionMinutes === null ? '-' : formatResolutionDuration(new Date(0).toISOString(), new Date(averageResolutionMinutes * 60000).toISOString())}</b>
+              {language === 'en' ? 'Average resolution time' : 'เวลาแก้ไขเฉลี่ย'} <b>{averageResolutionMinutes === null ? '-' : formatResolutionDuration(new Date(0).toISOString(), new Date(averageResolutionMinutes * 60000).toISOString(), language)}</b>
             </p>
           </div>
           <div className="assignee-kpi-section">
-            <h3>ผู้รับผิดชอบงาน</h3>
+            <h3>{language === 'en' ? 'Assignees' : 'ผู้รับผิดชอบงาน'}</h3>
             <div className="assignee-kpi-list">
               {assigneeKpis.length ? assigneeKpis.map(([assignee, kpi]) => (
                 <div className="assignee-kpi" key={assignee}>
                   <strong>{assignee}</strong>
-                  <span>ทั้งหมด {kpi.total} | ปิดแล้ว {kpi.completed} | ดำเนินการ {kpi.open}</span>
+                  <span>{language === 'en' ? `Total ${kpi.total} | Closed ${kpi.completed} | Active ${kpi.open}` : `ทั้งหมด ${kpi.total} | ปิดแล้ว ${kpi.completed} | ดำเนินการ ${kpi.open}`}</span>
                   <b>{Math.round((kpi.completed / kpi.total) * 100)}%</b>
                 </div>
               )) : (
-                <p className="empty-state">ยังไม่มี Ticket</p>
+                <p className="empty-state">{language === 'en' ? 'No tickets yet' : 'ยังไม่มี Ticket'}</p>
               )}
             </div>
           </div>
@@ -1029,27 +1050,27 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
 
         <div className="panel">
           <div className="panel-head">
-            <h2>สรุปอุปกรณ์</h2>
+            <h2>{language === 'en' ? 'Asset Summary' : 'สรุปอุปกรณ์'}</h2>
           </div>
           <div className="report-list">
             <p>
-              พร้อมใช้งาน <b>{available}</b>
+              {language === 'en' ? 'Available' : 'พร้อมใช้งาน'} <b>{available}</b>
             </p>
             <p>
-              กำลังใช้งาน <b>{inUse}</b>
+              {language === 'en' ? 'In use' : 'กำลังใช้งาน'} <b>{inUse}</b>
             </p>
             <p>
-              รอซ่อม/ตรวจสอบ <b>{maintenance}</b>
+              {language === 'en' ? 'Needs service' : 'รอซ่อม/ตรวจสอบ'} <b>{maintenance}</b>
             </p>
             <p>
-              รวมทั้งหมด <b>{assets.length}</b>
+              {language === 'en' ? 'Total' : 'รวมทั้งหมด'} <b>{assets.length}</b>
             </p>
           </div>
         </div>
 
         <div className="panel">
           <div className="panel-head">
-            <h2>Ticket ล่าสุด</h2>
+            <h2>{language === 'en' ? 'Recent Tickets' : 'Ticket ล่าสุด'}</h2>
           </div>
           <div className="recent-list">
             {tickets.slice(0, 4).map((ticket) => (
@@ -1064,7 +1085,7 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
                 <small>{ticket.status}</small>
               </div>
             ))}
-            {!tickets.length && <p className="empty-state">ยังไม่มี Ticket</p>}
+            {!tickets.length && <p className="empty-state">{language === 'en' ? 'No tickets yet' : 'ยังไม่มี Ticket'}</p>}
           </div>
         </div>
       </section>
@@ -1072,7 +1093,7 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
   );
 }
 
-function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd: () => void; onEdit: (asset: Asset) => void; onDelete: (asset: Asset) => void }) {
+function AssetView({ assets, language, onAdd, onEdit, onDelete }: { assets: Asset[]; language: Language; onAdd: () => void; onEdit: (asset: Asset) => void; onDelete: (asset: Asset) => void }) {
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
   const filteredAssets = normalizedQuery
@@ -1086,16 +1107,16 @@ function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd
   return (
     <section className="panel asset-inventory-panel">
       <div className="panel-head">
-        <h2>จัดเก็บอุปกรณ์</h2>
+        <h2>{language === 'en' ? 'Asset Inventory' : 'จัดเก็บอุปกรณ์'}</h2>
         <button className="primary" onClick={onAdd}>
-          <Plus size={16} /> เพิ่มอุปกรณ์
+          <Plus size={16} /> {language === 'en' ? 'Add Asset' : 'เพิ่มอุปกรณ์'}
         </button>
       </div>
 
       <div className="filters">
         <label className="search">
           <Search size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา ID, อุปกรณ์, Serial, สาขา หรือผู้จำหน่าย" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={language === 'en' ? 'Search ID, asset, serial, branch, or vendor' : 'ค้นหา ID, อุปกรณ์, Serial, สาขา หรือผู้จำหน่าย'} />
         </label>
       </div>
 
@@ -1104,18 +1125,18 @@ function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd
           <thead>
             <tr>
               <th>ID</th>
-              <th>ชื่ออุปกรณ์</th>
-              <th>ประเภท</th>
+              <th>{language === 'en' ? 'Asset Name' : 'ชื่ออุปกรณ์'}</th>
+              <th>{language === 'en' ? 'Type' : 'ประเภท'}</th>
               <th>Serial</th>
-              <th>สถานที่</th>
-              <th>เจ้าของ</th>
-              <th>สถานะ</th>
-              <th>วันที่ซื้อ</th>
+              <th>{language === 'en' ? 'Location' : 'สถานที่'}</th>
+              <th>{language === 'en' ? 'Owner' : 'เจ้าของ'}</th>
+              <th>{language === 'en' ? 'Status' : 'สถานะ'}</th>
+              <th>{language === 'en' ? 'Purchase Date' : 'วันที่ซื้อ'}</th>
             </tr>
           </thead>
           <tbody>
-            {filteredAssets.length ? filteredAssets.map((asset) => (
-              <tr key={asset.id}>
+            {filteredAssets.length ? filteredAssets.map((asset, index) => (
+              <tr key={`${asset.id}-${asset.serialNumber}-${asset.location}-${index}`}>
                 <td>
                   <b className="ticket-id">{asset.id}</b>
                 </td>
@@ -1131,10 +1152,10 @@ function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd
                 </td>
                 <td>
                   <div className="actions">
-                    <button className="icon-button" title="แก้ไข" onClick={() => onEdit(asset)}>
+                      <button className="icon-button" title={language === 'en' ? 'Edit' : 'แก้ไข'} onClick={() => onEdit(asset)}>
                       <Pencil size={14} />
                     </button>
-                    <button className="icon-button reject" title="ลบอุปกรณ์" onClick={() => onDelete(asset)}>
+                    <button className="icon-button reject" title={language === 'en' ? 'Delete asset' : 'ลบอุปกรณ์'} onClick={() => onDelete(asset)}>
                       <Trash2 size={14} />
                     </button>
                     {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH-u-ca-gregory') : '-'}
@@ -1143,7 +1164,7 @@ function AssetView({ assets, onAdd, onEdit, onDelete }: { assets: Asset[]; onAdd
               </tr>
             )) : (
               <tr>
-                <td className="empty-location-row" colSpan={8}>ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา</td>
+                <td className="empty-location-row" colSpan={8}>{language === 'en' ? 'No assets match your search' : 'ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา'}</td>
               </tr>
             )}
           </tbody>
@@ -1190,14 +1211,14 @@ function Login({ onLogin }: { onLogin: (staffId: string) => void }) {
         <p>OWNDAYS IT Management</p>
         <label>
           Staff ID
-          <input value={id} onChange={(event) => setId(event.target.value)} placeholder="เช่น 7748" />
+          <input value={id} onChange={(event) => setId(event.target.value)} placeholder={activeLanguage === 'en' ? 'e.g. 7748' : 'เช่น 7748'} />
         </label>
         <label>
           Password
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
         </label>
-        <button className="primary">เข้าสู่ระบบ</button>
-        {failed && <small className="error">Staff ID หรือรหัสผ่านไม่ถูกต้อง</small>}
+        <button className="primary">{activeLanguage === 'en' ? 'Log in' : 'เข้าสู่ระบบ'}</button>
+        {failed && <small className="error">{activeLanguage === 'en' ? 'Invalid Staff ID or password' : 'Staff ID หรือรหัสผ่านไม่ถูกต้อง'}</small>}
       </form>
     </div>
   );
@@ -1213,7 +1234,7 @@ function Stat({ label, value, note }: { label: string; value: number; note: stri
   );
 }
 
-function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAttachments }: { ticket: Ticket; users: User[]; onEdit: () => void; onApprove: (decision: 'Approved' | 'Rejected') => void; onStatusChange: (status: Ticket['status']) => void; onViewAttachments?: (ticket: Ticket) => void }) {
+function TicketRow({ ticket, users, language, isAdmin, onEdit, onApprove, onStatusChange, onViewAttachments }: { ticket: Ticket; users: User[]; language: Language; isAdmin: boolean; onEdit: () => void; onApprove: (decision: 'Approved' | 'Rejected') => void; onStatusChange: (status: Ticket['status']) => void; onViewAttachments?: (ticket: Ticket) => void }) {
   const assigneeName = users.find((user) => user.staffId === ticket.assignee)?.name ?? ticket.assignee;
 
   return (
@@ -1221,10 +1242,10 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
       <td>
         <b className="ticket-id">#{ticket.id}</b>
         <small>
-          สร้าง: {new Date(ticket.createdAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })}
+          {language === 'en' ? 'Created:' : 'สร้าง:'} {new Date(ticket.createdAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })}
           {ticket.createdAt && ' ' + new Date(ticket.createdAt).toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit' })}
-          {ticket.completedAt && <><br />ปิด: {new Date(ticket.completedAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit' })}</>}
-          {ticket.attachments && ticket.attachments.length > 0 && <><br /><span className="attachment-indicator">📎 {ticket.attachments.length} ไฟล์</span></>}
+          {ticket.completedAt && <><br />{language === 'en' ? 'Completed:' : 'ปิด:'} {new Date(ticket.completedAt).toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' })} {new Date(ticket.completedAt).toLocaleTimeString('th-TH-u-ca-gregory', { hour: '2-digit', minute: '2-digit' })}</>}
+          {ticket.attachments && ticket.attachments.length > 0 && <><br /><span className="attachment-indicator">📎 {ticket.attachments.length} {language === 'en' ? 'files' : 'ไฟล์'}</span></>}
         </small>
       </td>
       <td>{ticket.storeName}</td>
@@ -1236,7 +1257,7 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
       </td>
       <td>
         <span className={`badge ${ticket.approval ? ticket.approval.toLowerCase() : 'waiting'}`}>
-          {ticket.approval === 'Approved' ? 'อนุมัติแล้ว' : ticket.approval === 'Rejected' ? 'ไม่อนุมัติ' : 'รอตรวจสอบ'}
+          {ticket.approval === 'Approved' ? (language === 'en' ? 'Approved' : 'อนุมัติแล้ว') : ticket.approval === 'Rejected' ? (language === 'en' ? 'Rejected' : 'ไม่อนุมัติ') : (language === 'en' ? 'Pending review' : 'รอตรวจสอบ')}
         </span>
       </td>
       <td>
@@ -1247,10 +1268,10 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
             value={ticket.status}
             onChange={(event) => onStatusChange(event.target.value as Ticket['status'])}
           >
-            <option value="Pending">รอดำเนินการ</option>
-            <option value="In Progress">กำลังดำเนินการ</option>
-            <option value="Completed">เสร็จสิ้น</option>
-            <option value="Rejected">ยกเลิก</option>
+            <option value="Pending">{language === 'en' ? 'Pending' : 'รอดำเนินการ'}</option>
+            <option value="In Progress">{language === 'en' ? 'In progress' : 'กำลังดำเนินการ'}</option>
+            <option value="Completed">{language === 'en' ? 'Completed' : 'เสร็จสิ้น'}</option>
+            <option value="Rejected">{language === 'en' ? 'Rejected' : 'ยกเลิก'}</option>
           </select>
           {ticket.attachments && ticket.attachments.length > 0 && (
             <button className="icon-button" title="ดูไฟล์แนบ" onClick={() => onViewAttachments?.(ticket)}>
@@ -1260,7 +1281,7 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
           <button className="icon-button" title="แก้ไข" onClick={onEdit}>
             <Pencil size={14} />
           </button>
-          {!ticket.approval && (
+          {isAdmin && !ticket.approval && (
             <>
               <button className="icon-button approve" title="อนุมัติ" onClick={() => onApprove('Approved')}>
                 <Check size={14} />
@@ -1278,12 +1299,14 @@ function TicketRow({ ticket, users, onEdit, onApprove, onStatusChange, onViewAtt
 
 function AdminView({
   users,
+  language,
   masterData,
   setMasterData,
   onAddUser,
   onEditUser,
 }: {
   users: User[];
+  language: Language;
   masterData: MasterData;
   setMasterData: (data: MasterData) => void;
   onAddUser: () => void;
@@ -1421,9 +1444,12 @@ function AdminView({
       };
       if (!item.id && !item.shortName && !item.fullName) return;
 
+      const duplicateLocation = masterData.locations.some((entry) => locationIdentity(entry) === locationIdentity(item) && locationIdentity(entry) !== editingLocationKey);
+      if (duplicateLocation) return;
+
       const nextLocations = editingLocationKey
         ? masterData.locations.map((entry) => {
-            const entryKey = `${entry.id}-${entry.shortName}-${entry.fullName}`;
+        const entryKey = locationIdentity(entry);
             return entryKey === editingLocationKey ? item : entry;
           })
         : [...masterData.locations, item];
@@ -1448,10 +1474,10 @@ function AdminView({
   };
 
   const removeLocationItem = (item: LocationMasterItem) => {
-    const key = `${item.id}-${item.shortName}-${item.fullName}`;
+    const key = locationIdentity(item);
     setMasterData({
       ...masterData,
-      locations: masterData.locations.filter((entry) => `${entry.id}-${entry.shortName}-${entry.fullName}` !== key),
+      locations: masterData.locations.filter((entry) => locationIdentity(entry) !== key),
     });
     if (editingLocationKey === key) resetLocationForm();
   };
@@ -1461,7 +1487,7 @@ function AdminView({
     setLocationShortNameInput(item.shortName);
     setLocationFullNameInput(item.fullName);
     setLocationBudgetInput(item.budget === undefined ? '' : item.budget.toLocaleString('en-US', { maximumFractionDigits: 2 }));
-    setEditingLocationKey(`${item.id}-${item.shortName}-${item.fullName}`);
+    setEditingLocationKey(locationIdentity(item));
   };
 
   const categoryItems = sortList(masterData.categories);
@@ -1472,15 +1498,15 @@ function AdminView({
   return (
     <section className="panel admin-master-panel">
       <div className="panel-head">
-        <h2>ผู้ดูแลระบบ</h2>
+        <h2>{language === 'en' ? 'Administrator' : 'ผู้ดูแลระบบ'}</h2>
       </div>
 
       <div className="admin-layout">
         <div className="panel admin-users-panel">
           <div className="panel-head">
-            <h2>รายชื่อผู้ใช้งาน</h2>
+            <h2>{language === 'en' ? 'Users' : 'รายชื่อผู้ใช้งาน'}</h2>
             <button className="primary" onClick={onAddUser}>
-              <Plus size={16} /> เพิ่มรายชื่อ
+              <Plus size={16} /> {language === 'en' ? 'Add user' : 'เพิ่มรายชื่อ'}
             </button>
           </div>
           <div className="admin-user-list">
@@ -1505,14 +1531,14 @@ function AdminView({
                 </div>
               ))
             ) : (
-              <p className="empty-state">ยังไม่มีข้อมูลผู้ใช้งาน</p>
+              <p className="empty-state">{language === 'en' ? 'No users yet' : 'ยังไม่มีข้อมูลผู้ใช้งาน'}</p>
             )}
           </div>
         </div>
 
         <div className="panel admin-form-panel">
           <div className="panel-head">
-            <h2>จัดการข้อมูลหลัก</h2>
+            <h2>{language === 'en' ? 'Master Data' : 'จัดการข้อมูลหลัก'}</h2>
           </div>
 
           <div className="master-data-sections">
@@ -1520,13 +1546,13 @@ function AdminView({
               <div className="master-data-header">
                 <div>
                   <h3>Category</h3>
-                  <small>ประเภทอุปกรณ์</small>
+                  <small>{language === 'en' ? 'Ticket category' : 'ประเภทอุปกรณ์'}</small>
                 </div>
                 <span className="master-data-count">{masterData.categories.length}</span>
               </div>
               <div className="inline-form">
-                <input value={categoryInput} onChange={(event) => setCategoryInput(event.target.value)} placeholder="เพิ่ม category" />
-                <button className="primary" onClick={addCategoryItem}>{editingCategoryKey ? 'บันทึก' : 'เพิ่ม'}</button>
+                <input value={categoryInput} onChange={(event) => setCategoryInput(event.target.value)} placeholder={language === 'en' ? 'Add category' : 'เพิ่ม category'} />
+                <button className="primary" onClick={addCategoryItem}>{editingCategoryKey ? (language === 'en' ? 'Save' : 'บันทึก') : (language === 'en' ? 'Add' : 'เพิ่ม')}</button>
               </div>
               {masterData.categories.length ? (
                 <div className="permission-chips category-tags">
@@ -1545,7 +1571,7 @@ function AdminView({
                   ))}
                 </div>
               ) : (
-                <p className="empty-mini">ยังไม่มีข้อมูล</p>
+                <p className="empty-mini">{language === 'en' ? 'No data yet' : 'ยังไม่มีข้อมูล'}</p>
               )}
             </div>
 
@@ -1553,13 +1579,13 @@ function AdminView({
               <div className="master-data-header">
                 <div>
                   <h3>Asset Type</h3>
-                  <small>ประเภทอุปกรณ์สำหรับทะเบียนทรัพย์สิน</small>
+                  <small>{language === 'en' ? 'Equipment types for asset inventory' : 'ประเภทอุปกรณ์สำหรับทะเบียนทรัพย์สิน'}</small>
                 </div>
                 <span className="master-data-count">{masterData.assetTypes.length}</span>
               </div>
               <div className="inline-form">
-                <input value={assetTypeInput} onChange={(event) => setAssetTypeInput(event.target.value)} placeholder="เพิ่มประเภทอุปกรณ์" />
-                <button className="primary" onClick={addAssetTypeItem}>{editingAssetTypeKey ? 'บันทึก' : 'เพิ่ม'}</button>
+                <input value={assetTypeInput} onChange={(event) => setAssetTypeInput(event.target.value)} placeholder={language === 'en' ? 'Add asset type' : 'เพิ่มประเภทอุปกรณ์'} />
+                <button className="primary" onClick={addAssetTypeItem}>{editingAssetTypeKey ? (language === 'en' ? 'Save' : 'บันทึก') : (language === 'en' ? 'Add' : 'เพิ่ม')}</button>
               </div>
               {masterData.assetTypes.length ? (
                 <div className="permission-chips category-tags">
@@ -1582,13 +1608,13 @@ function AdminView({
               <div className="master-data-header">
                 <div>
                   <h3>Vendor</h3>
-                  <small>ผู้จำหน่าย</small>
+                  <small>{language === 'en' ? 'Supplier' : 'ผู้จำหน่าย'}</small>
                 </div>
                 <span className="master-data-count">{masterData.vendors.length}</span>
               </div>
               <div className="inline-form">
-                <input value={vendorInput} onChange={(event) => setVendorInput(event.target.value)} placeholder="เพิ่ม vendor" />
-                <button className="primary" onClick={addVendorItem}>{editingVendorKey ? 'บันทึก' : 'เพิ่ม'}</button>
+                <input value={vendorInput} onChange={(event) => setVendorInput(event.target.value)} placeholder={language === 'en' ? 'Add vendor' : 'เพิ่ม vendor'} />
+                <button className="primary" onClick={addVendorItem}>{editingVendorKey ? (language === 'en' ? 'Save' : 'บันทึก') : (language === 'en' ? 'Add' : 'เพิ่ม')}</button>
               </div>
               {masterData.vendors.length ? (
                 <div className="permission-chips category-tags">
@@ -1615,7 +1641,7 @@ function AdminView({
               <div className="master-data-header">
                 <div>
                   <h3>Location</h3>
-                  <small>สาขา / สถานที่</small>
+                  <small>{language === 'en' ? 'Branch / Location' : 'สาขา / สถานที่'}</small>
                 </div>
                 <span className="master-data-count">{masterData.locations.length}</span>
               </div>
@@ -1639,7 +1665,7 @@ function AdminView({
               {masterData.locations.length ? (
                 <div className="permission-chips location-tags">
                   {locationItems.map((item) => {
-                    const key = `${item.id}-${item.shortName}-${item.fullName}`;
+                    const key = locationIdentity(item);
                     return (
                       <div key={key} className="location-tag-item">
                         <span>{formatLocationLabel(item)}</span>
@@ -1760,6 +1786,7 @@ function AssetModal({
   currentUserName,
   assets,
   editingAssetId,
+  saving,
 }: {
   form: Partial<Asset>;
   setForm: (form: Partial<Asset>) => void;
@@ -1770,6 +1797,7 @@ function AssetModal({
   currentUserName: string;
   assets: Asset[];
   editingAssetId?: string;
+  saving: boolean;
 }) {
   const update = (key: keyof Asset, value: string) => setForm({ ...form, [key]: value });
   const formatThbPrice = (price: number) => price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1784,7 +1812,7 @@ function AssetModal({
     <div className="modal-backdrop">
       <form className="modal" onSubmit={onSubmit}>
         <div className="modal-head">
-          <h2>{editing ? 'แก้ไขอุปกรณ์' : 'เพิ่มอุปกรณ์ใหม่'}</h2>
+          <h2>{editing ? (activeLanguage === 'en' ? 'Edit Asset' : 'แก้ไขอุปกรณ์') : (activeLanguage === 'en' ? 'Add New Asset' : 'เพิ่มอุปกรณ์ใหม่')}</h2>
           <button type="button" className="close" onClick={onClose}>
             <X />
           </button>
@@ -1792,13 +1820,13 @@ function AssetModal({
 
         <div className="form-grid">
           <label>
-            ชื่ออุปกรณ์
+            {activeLanguage === 'en' ? 'Asset Name' : 'ชื่ออุปกรณ์'}
             <input required value={form.assetName ?? ''} onChange={(event) => update('assetName', event.target.value)} />
           </label>
           <label>
-            ประเภท
+            {activeLanguage === 'en' ? 'Type' : 'ประเภท'}
             <select required value={form.category ?? ''} onChange={(event) => update('category', event.target.value)}>
-              <option value="">เลือกประเภท</option>
+              <option value="">{activeLanguage === 'en' ? 'Select type' : 'เลือกประเภท'}</option>
               {(masterData.assetTypes.length ? masterData.assetTypes : ['CCTV', 'EDC', 'LAPTOP', 'POS TERMINAL', 'PRINTER']).map((category) => (
                 <option key={category}>{category}</option>
               ))}
@@ -1810,9 +1838,9 @@ function AssetModal({
             {duplicateSerial && <small className="field-error">Serial Number นี้มีอยู่ในระบบแล้ว</small>}
           </label>
           <label>
-            สถานที่
+            {activeLanguage === 'en' ? 'Location' : 'สถานที่'}
             <select value={form.location ?? ''} onChange={(event) => update('location', event.target.value)}>
-              <option value="">เลือกสาขา</option>
+              <option value="">{activeLanguage === 'en' ? 'Select branch' : 'เลือกสาขา'}</option>
               {(masterData.locations.length ? masterData.locations : ['HQ - สำนักงานใหญ่ (Head Office)', '201 - MGB - Mega Bangna']).map((location) => {
                 const normalized = normalizeLocationEntry(location);
                 const optionValue = formatLocationLabel(normalized);
@@ -1825,11 +1853,11 @@ function AssetModal({
             </select>
           </label>
           <label>
-            เจ้าของ
+            {activeLanguage === 'en' ? 'Owner' : 'เจ้าของ'}
             <input value={currentUserName} disabled />
           </label>
           <label>
-            สถานะ
+            {activeLanguage === 'en' ? 'Status' : 'สถานะ'}
             <select value={form.status ?? 'In Use'} onChange={(event) => {
               const status = event.target.value as AssetStatus;
               setForm({ ...form, status, replacementAvailability: status === 'Maintenance' ? form.replacementAvailability : undefined, replacementDetails: status === 'Maintenance' ? form.replacementDetails : '' });
@@ -1841,36 +1869,36 @@ function AssetModal({
           </label>
           {form.status === 'Maintenance' && (
             <div className="full replacement-section">
-              <span className="form-grid-label">มีเครื่องทดแทนหรือไม่</span>
+              <span className="form-grid-label">{activeLanguage === 'en' ? 'Is there a replacement device?' : 'มีเครื่องทดแทนหรือไม่'}</span>
               <div className="replacement-options">
-                <button type="button" className={`replacement-option ${form.replacementAvailability === 'yes' ? 'selected' : ''}`} onClick={() => setForm({ ...form, replacementAvailability: 'yes' })}>มีเครื่องทดแทน</button>
-                <button type="button" className={`replacement-option ${form.replacementAvailability === 'no' ? 'selected' : ''}`} onClick={() => setForm({ ...form, replacementAvailability: 'no', replacementDetails: '' })}>ไม่มีเครื่องทดแทน</button>
+                <button type="button" className={`replacement-option ${form.replacementAvailability === 'yes' ? 'selected' : ''}`} onClick={() => setForm({ ...form, replacementAvailability: 'yes' })}>{activeLanguage === 'en' ? 'Yes, replacement available' : 'มีเครื่องทดแทน'}</button>
+                <button type="button" className={`replacement-option ${form.replacementAvailability === 'no' ? 'selected' : ''}`} onClick={() => setForm({ ...form, replacementAvailability: 'no', replacementDetails: '' })}>{activeLanguage === 'en' ? 'No replacement' : 'ไม่มีเครื่องทดแทน'}</button>
               </div>
               {form.replacementAvailability === 'yes' && (
                 <label className="replacement-details">
-                  ข้อมูลเครื่องทดแทน
-                  <input required value={form.replacementDetails ?? ''} placeholder="เช่น รุ่น, Serial Number, รหัสทรัพย์สิน" onChange={(event) => update('replacementDetails', event.target.value)} />
+                  {activeLanguage === 'en' ? 'Replacement device details' : 'ข้อมูลเครื่องทดแทน'}
+                  <input required value={form.replacementDetails ?? ''} placeholder={activeLanguage === 'en' ? 'e.g. model, serial number, asset ID' : 'เช่น รุ่น, Serial Number, รหัสทรัพย์สิน'} onChange={(event) => update('replacementDetails', event.target.value)} />
                 </label>
               )}
             </div>
           )}
           <label>
-            วันที่ซื้อ
+            {activeLanguage === 'en' ? 'Purchase Date' : 'วันที่ซื้อ'}
             <DatePicker value={form.purchaseDate ?? ''} onChange={(value) => update('purchaseDate', value)} />
           </label>
           <label>
-            วันที่ติดตั้ง
+            {activeLanguage === 'en' ? 'Installation Date' : 'วันที่ติดตั้ง'}
             <DatePicker value={form.installationDate ?? ''} onChange={(value) => update('installationDate', value)} />
           </label>
           <label className="full">
-            ผู้จำหน่าย
+            {activeLanguage === 'en' ? 'Vendor' : 'ผู้จำหน่าย'}
             <select value={form.vendor ?? ''} onChange={(event) => update('vendor', event.target.value)}>
-              <option value="">เลือกผู้จำหน่าย</option>
+              <option value="">{activeLanguage === 'en' ? 'Select vendor' : 'เลือกผู้จำหน่าย'}</option>
               {vendorOptions.map((vendor) => <option key={vendor} value={vendor}>{vendor}</option>)}
             </select>
           </label>
           <label>
-            ราคาก่อน VAT (THB)
+            {activeLanguage === 'en' ? 'Price before VAT (THB)' : 'ราคาก่อน VAT (THB)'}
             <input type="text" inputMode="decimal" value={priceInput} onFocus={() => setPriceInput((value) => value.replace(/,/g, ''))} onChange={(event) => {
               const rawValue = event.target.value.replace(/,/g, '');
               if (!/^\d*(\.\d{0,2})?$/.test(rawValue)) return;
@@ -1887,18 +1915,18 @@ function AssetModal({
             }} />
           </label>
           <label>
-            ราคาก่อน VAT (USD)
+            {activeLanguage === 'en' ? 'Price before VAT (USD)' : 'ราคาก่อน VAT (USD)'}
             <input value={priceBeforeVat ? `$${priceBeforeVatUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} placeholder={`คำนวณที่ 1 USD = ${usdExchangeRate} THB`} disabled />
           </label>
           <label className="full">
-            หมายเหตุ
+            {activeLanguage === 'en' ? 'Notes' : 'หมายเหตุ'}
             <textarea rows={3} value={form.remark ?? ''} onChange={(event) => update('remark', event.target.value)} />
           </label>
         </div>
 
         <div className="modal-actions">
-          <button type="button" className="ghost" onClick={onClose}>ยกเลิก</button>
-          <button className="primary" disabled={duplicateSerial}>บันทึก</button>
+          <button type="button" className="ghost" onClick={onClose}>{activeLanguage === 'en' ? 'Cancel' : 'ยกเลิก'}</button>
+          <button className="primary" disabled={duplicateSerial || saving}>{saving ? (activeLanguage === 'en' ? 'Saving...' : 'กำลังบันทึก...') : (activeLanguage === 'en' ? 'Save' : 'บันทึก')}</button>
         </div>
       </form>
     </div>
@@ -1915,7 +1943,7 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
   const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
   const firstDay = new Date(displayYear, displayMonth, 1).getDay();
   const selectedDay = value && selectedDate.getFullYear() === displayYear && selectedDate.getMonth() === displayMonth ? selectedDate.getDate() : 0;
-  const formattedDate = value ? selectedDate.toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' }) : 'เลือกวันเดือนปี';
+  const formattedDate = value ? selectedDate.toLocaleDateString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit' }) : (activeLanguage === 'en' ? 'Select date' : 'เลือกวันเดือนปี');
 
   const selectDay = (day: number) => {
     onChange(`${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
@@ -1930,10 +1958,10 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
       {isOpen && (
         <div className="calendar-popover">
           <div className="calendar-selectors">
-            <select value={displayMonth} onChange={(event) => setDisplayMonth(Number(event.target.value))} aria-label="เดือน">
+            <select value={displayMonth} onChange={(event) => setDisplayMonth(Number(event.target.value))} aria-label={activeLanguage === 'en' ? 'Month' : 'เดือน'}>
               {months.map((month, index) => <option key={month} value={index}>{month}</option>)}
             </select>
-            <select value={displayYear} onChange={(event) => setDisplayYear(Number(event.target.value))} aria-label="ปี">
+            <select value={displayYear} onChange={(event) => setDisplayYear(Number(event.target.value))} aria-label={activeLanguage === 'en' ? 'Year' : 'ปี'}>
               {years.map((year) => <option key={year} value={year}>{year}</option>)}
             </select>
           </div>
@@ -1952,7 +1980,8 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
-function Reports({ tickets, years, period, startDate, endDate, month, year, onPeriodChange, onStartDateChange, onEndDateChange, onMonthChange, onYearChange, onExport }: { tickets: Ticket[]; years: string[]; period: ReportPeriod; startDate: string; endDate: string; month: string; year: string; onPeriodChange: (period: ReportPeriod) => void; onStartDateChange: (date: string) => void; onEndDateChange: (date: string) => void; onMonthChange: (month: string) => void; onYearChange: (year: string) => void; onExport: () => void }) {
+function Reports({ tickets, language, years, period, startDate, endDate, month, year, onPeriodChange, onStartDateChange, onEndDateChange, onMonthChange, onYearChange, onExport }: { tickets: Ticket[]; language: Language; years: string[]; period: ReportPeriod; startDate: string; endDate: string; month: string; year: string; onPeriodChange: (period: ReportPeriod) => void; onStartDateChange: (date: string) => void; onEndDateChange: (date: string) => void; onMonthChange: (month: string) => void; onYearChange: (year: string) => void; onExport: () => void }) {
+  const english = language === 'en';
   const months = [
     ['01', 'January'], ['02', 'February'], ['03', 'March'], ['04', 'April'],
     ['05', 'May'], ['06', 'June'], ['07', 'July'], ['08', 'August'],
@@ -1975,19 +2004,19 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
     <>
       <section className="panel report-filters-panel">
         <div className="panel-head">
-          <h2>เลือกระยะเวลารายงาน</h2>
-          <span className="report-count">{tickets.length} รายการ</span>
+          <h2>{english ? 'Select report period' : 'เลือกระยะเวลารายงาน'}</h2>
+          <span className="report-count">{tickets.length} {english ? 'tickets' : 'รายการ'}</span>
         </div>
         <div className="filters report-filters">
           <select value={period} onChange={(event) => onPeriodChange(event.target.value as ReportPeriod)} aria-label="รูปแบบช่วงเวลารายงาน">
-            <option value="range">เลือกช่วงวันที่</option>
-            <option value="month">เลือกเดือน</option>
-            <option value="year">เลือกปี</option>
+            <option value="range">{english ? 'Date range' : 'เลือกช่วงวันที่'}</option>
+            <option value="month">{english ? 'Month' : 'เลือกเดือน'}</option>
+            <option value="year">{english ? 'Year' : 'เลือกปี'}</option>
           </select>
           {period === 'range' && (
             <>
-              <label className="date-filter">ตั้งแต่วันที่<input type="date" value={startDate} max={endDate || undefined} onChange={(event) => onStartDateChange(event.target.value)} /></label>
-              <label className="date-filter">ถึงวันที่<input type="date" value={endDate} min={startDate || undefined} onChange={(event) => onEndDateChange(event.target.value)} /></label>
+              <label className="date-filter">{english ? 'From' : 'ตั้งแต่วันที่'}<input type="date" value={startDate} max={endDate || undefined} onChange={(event) => onStartDateChange(event.target.value)} /></label>
+              <label className="date-filter">{english ? 'To' : 'ถึงวันที่'}<input type="date" value={endDate} min={startDate || undefined} onChange={(event) => onEndDateChange(event.target.value)} /></label>
             </>
           )}
           {period === 'month' && (
@@ -2003,7 +2032,7 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
       <section className="report-grid">
         <div className="panel">
           <div className="panel-head">
-            <h2>ภาพรวมตามหมวดหมู่</h2>
+            <h2>{english ? 'Overview by category' : 'ภาพรวมตามหมวดหมู่'}</h2>
           </div>
           {groups.length ? (
             groups.map(([category, count]) => (
@@ -2016,26 +2045,26 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
               </div>
             ))
           ) : (
-            <p>ยังไม่มีข้อมูล</p>
+            <p>{english ? 'No data yet' : 'ยังไม่มีข้อมูล'}</p>
           )}
         </div>
 
         <div className="panel">
           <div className="panel-head">
-            <h2>สรุปสถานะ</h2>
+            <h2>{english ? 'Status summary' : 'สรุปสถานะ'}</h2>
           </div>
           <div className="report-list">
             <p>
-              รออนุมัติ <b>{tickets.filter((ticket) => !ticket.approval).length}</b>
+              {english ? 'Pending review' : 'รออนุมัติ'} <b>{tickets.filter((ticket) => !ticket.approval).length}</b>
             </p>
             <p>
-              อนุมัติแล้ว <b>{tickets.filter((ticket) => ticket.approval === 'Approved').length}</b>
+              {english ? 'Approved' : 'อนุมัติแล้ว'} <b>{tickets.filter((ticket) => ticket.approval === 'Approved').length}</b>
             </p>
             <p>
-              ไม่อนุมัติ <b>{tickets.filter((ticket) => ticket.approval === 'Rejected').length}</b>
+              {english ? 'Rejected' : 'ไม่อนุมัติ'} <b>{tickets.filter((ticket) => ticket.approval === 'Rejected').length}</b>
             </p>
             <p>
-              เวลาแก้ไขเฉลี่ย <b>{averageResolutionMinutes === null ? '-' : formatResolutionDuration(new Date(0).toISOString(), new Date(averageResolutionMinutes * 60000).toISOString())}</b>
+              {english ? 'Average resolution time' : 'เวลาแก้ไขเฉลี่ย'} <b>{averageResolutionMinutes === null ? '-' : formatResolutionDuration(new Date(0).toISOString(), new Date(averageResolutionMinutes * 60000).toISOString(), language)}</b>
             </p>
           </div>
         </div>
@@ -2043,12 +2072,12 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
 
       <section className="panel">
         <div className="panel-head">
-          <h2>ประวัติทั้งหมด</h2>
+          <h2>{english ? 'History' : 'ประวัติทั้งหมด'}</h2>
           <button className="ghost" onClick={onExport}>
-            <Download size={15} /> ดาวน์โหลด CSV
+            <Download size={15} /> {english ? 'Download CSV' : 'ดาวน์โหลด CSV'}
           </button>
         </div>
-        <p className="sub">มี Ticket ทั้งหมด {tickets.length} รายการ</p>
+        <p className="sub">{english ? `${tickets.length} tickets` : `มี Ticket ทั้งหมด ${tickets.length} รายการ`}</p>
         <div className="table-wrap">
           <table className="dashboard-table">
             <thead>
@@ -2056,12 +2085,12 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
                 <th>ID</th>
                 <th>Created</th>
                 <th>Completed</th>
-                <th>เวลาแก้ไข</th>
-                <th>สาขา</th>
-                <th>หมวดหมู่</th>
-                <th>รายละเอียด</th>
-                <th>สถานะ</th>
-                <th>อนุมัติ</th>
+                <th>{english ? 'Resolution' : 'เวลาแก้ไข'}</th>
+                <th>{english ? 'Branch' : 'สาขา'}</th>
+                <th>{english ? 'Category' : 'หมวดหมู่'}</th>
+                <th>{english ? 'Description' : 'รายละเอียด'}</th>
+                <th>{english ? 'Status' : 'สถานะ'}</th>
+                <th>{english ? 'Approval' : 'อนุมัติ'}</th>
               </tr>
             </thead>
             <tbody>
@@ -2070,16 +2099,16 @@ function Reports({ tickets, years, period, startDate, endDate, month, year, onPe
                   <td><b className="ticket-id">#{ticket.id}</b></td>
                   <td>{new Date(ticket.createdAt).toLocaleString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                   <td>{ticket.completedAt ? new Date(ticket.completedAt).toLocaleString('th-TH-u-ca-gregory', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                  <td>{formatResolutionDuration(ticket.createdAt, ticket.completedAt)}</td>
+                  <td>{formatResolutionDuration(ticket.createdAt, ticket.completedAt, language)}</td>
                   <td>{ticket.storeName}</td>
                   <td>{ticket.category}</td>
                   <td className="desc">{ticket.description}</td>
                   <td><span className={`badge ${ticket.status.toLowerCase().replace(' ', '-')}`}>{ticket.status}</span></td>
-                  <td><span className={`badge ${ticket.approval ? ticket.approval.toLowerCase() : 'waiting'}`}>{ticket.approval === 'Approved' ? 'อนุมัติแล้ว' : ticket.approval === 'Rejected' ? 'ไม่อนุมัติ' : 'รอตรวจสอบ'}</span></td>
+                  <td><span className={`badge ${ticket.approval ? ticket.approval.toLowerCase() : 'waiting'}`}>{ticket.approval === 'Approved' ? (english ? 'Approved' : 'อนุมัติแล้ว') : ticket.approval === 'Rejected' ? (english ? 'Rejected' : 'ไม่อนุมัติ') : (english ? 'Pending review' : 'รอตรวจสอบ')}</span></td>
                 </tr>
               )) : (
                 <tr>
-                  <td className="empty-location-row" colSpan={9}>ไม่พบ Ticket ในช่วงเวลาที่เลือก</td>
+                  <td className="empty-location-row" colSpan={9}>{english ? 'No tickets in the selected period' : 'ไม่พบ Ticket ในช่วงเวลาที่เลือก'}</td>
                 </tr>
               )}
             </tbody>
@@ -2121,7 +2150,7 @@ function TicketModal({
     <div className="modal-backdrop">
       <form className="modal" onSubmit={onSubmit}>
         <div className="modal-head">
-          <h2>{editing ? 'แก้ไข Ticket' : 'สร้าง Ticket ใหม่'}</h2>
+          <h2>{editing ? (activeLanguage === 'en' ? 'Edit Ticket' : 'แก้ไข Ticket') : (activeLanguage === 'en' ? 'Create New Ticket' : 'สร้าง Ticket ใหม่')}</h2>
           <button type="button" className="close" onClick={onClose}>
             <X />
           </button>
@@ -2130,9 +2159,9 @@ function TicketModal({
 
         <div className="form-grid">
           <label>
-            สาขา / สถานที่
+            {activeLanguage === 'en' ? 'Branch / Location' : 'สาขา / สถานที่'}
             <select required value={form.storeName} onChange={(event) => update('storeName', event.target.value)}>
-              <option value="">เลือกสาขา</option>
+              <option value="">{activeLanguage === 'en' ? 'Select branch' : 'เลือกสาขา'}</option>
               {(masterData.locations.length ? masterData.locations : ['HQ - สำนักงานใหญ่ (Head Office)', '201 - MGB - Mega Bangna']).map((location) => {
                 const normalized = normalizeLocationEntry(location);
                 const optionValue = formatLocationLabel(normalized);
@@ -2145,20 +2174,20 @@ function TicketModal({
             </select>
           </label>
           <label>
-            หมวดหมู่
+            {activeLanguage === 'en' ? 'Category' : 'หมวดหมู่'}
             <select required value={form.category} onChange={(event) => update('category', event.target.value)}>
-              <option value="">เลือกหมวดหมู่</option>
+              <option value="">{activeLanguage === 'en' ? 'Select category' : 'เลือกหมวดหมู่'}</option>
               {(masterData.categories.length ? masterData.categories : ['Front2 POS', 'Printer', 'Internet/WiFi']).map((category) => (
                 <option key={category}>{category}</option>
               ))}
             </select>
           </label>
           <label className="full">
-            รายละเอียดปัญหา
+            {activeLanguage === 'en' ? 'Problem description' : 'รายละเอียดปัญหา'}
             <textarea required rows={4} value={form.description} onChange={(event) => update('description', event.target.value)} />
           </label>
           <label>
-            ผู้รับผิดชอบ
+            {activeLanguage === 'en' ? 'Assignee' : 'ผู้รับผิดชอบ'}
             <input disabled value={form.assignee} />
           </label>
           <label>
@@ -2171,7 +2200,7 @@ function TicketModal({
             </select>
           </label>
           <label className="full">
-            แนบไฟล์ (รูป, Excel, PDF)
+            {activeLanguage === 'en' ? 'Attachments (image, Excel, PDF)' : 'แนบไฟล์ (รูป, Excel, PDF)'}
             <input
               type="file"
               multiple
@@ -2182,7 +2211,7 @@ function TicketModal({
                   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
                   const maxSize = 50 * 1024 * 1024; // 50 MB max
                   if (totalSize > maxSize) {
-                    setError(`ขนาดไฟล์รวมไม่ควรเกิน 50 MB (ปัจจุบัน ${(totalSize / 1024 / 1024).toFixed(2)} MB)`);
+                    setError(activeLanguage === 'en' ? `Total file size must not exceed 50 MB (current ${(totalSize / 1024 / 1024).toFixed(2)} MB)` : `ขนาดไฟล์รวมไม่ควรเกิน 50 MB (ปัจจุบัน ${(totalSize / 1024 / 1024).toFixed(2)} MB)`);
                     event.target.value = '';
                   } else {
                     setError('');
@@ -2194,7 +2223,7 @@ function TicketModal({
           </label>
           {attachmentFiles.length > 0 && (
             <div className="full attachment-list">
-              <small>ไฟล์ที่เลือก:</small>
+              <small>{activeLanguage === 'en' ? 'Selected files:' : 'ไฟล์ที่เลือก:'}</small>
               <ul>
                 {attachmentFiles.map((file) => (
                   <li key={file.name}>

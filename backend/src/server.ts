@@ -63,6 +63,7 @@ const userPatchSchema = userInputSchema.partial();
 const approvalSchema = z.object({
   decision: z.enum(['Approved', 'Rejected']),
   approvedBy: z.string().trim().min(1).max(120),
+  approverStaffId: z.string().trim().min(1).max(20),
 });
 
 type Ticket = z.infer<typeof ticketInputSchema> & {
@@ -130,13 +131,17 @@ function normalizeLocationEntry(value: string | LocationMasterItem | null | unde
   if (!value) return null;
 
   if (typeof value !== 'string') {
-    const id = (value.id ?? '').trim();
+    const rawId = (value.id ?? '').trim();
     const shortName = (value.shortName ?? '').trim();
     const fullName = (value.fullName ?? '').trim();
     const budget = typeof value.budget === 'number' && Number.isFinite(value.budget) && value.budget >= 0 ? value.budget : undefined;
 
-    if (!id && !shortName && !fullName) return null;
-    return { id: id || shortName || fullName, shortName, fullName, budget };
+    const embeddedLocation = rawId.match(/^([A-Za-z0-9]+)\s*[-–]\s*(.+?)\s*[-–]\s*(.+)$/);
+    if (embeddedLocation) {
+      return { id: embeddedLocation[1].trim(), shortName: embeddedLocation[2].trim(), fullName: embeddedLocation[3].trim(), budget };
+    }
+    if (!rawId && !shortName && !fullName) return null;
+    return { id: rawId || shortName || fullName, shortName, fullName, budget };
   }
 
   const text = value.trim();
@@ -209,11 +214,39 @@ async function saveTickets(tickets: Ticket[]) {
 }
 
 async function readAssets(): Promise<Asset[]> {
-  return readJsonFile<Asset[]>(assetsFile, []);
+  const assets = await readJsonFile<Asset[]>(assetsFile, []);
+  const usedIds = new Set<string>();
+  let nextSequence = assets.reduce((highest, asset) => {
+    const match = asset.id.match(/^AS-\d{8}-(\d{4})$/);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0) + 1;
+  let changed = false;
+  const normalizedAssets = assets.map((asset) => {
+    if (!usedIds.has(asset.id)) {
+      usedIds.add(asset.id);
+      return asset;
+    }
+
+    const datePart = asset.createdAt?.slice(0, 10).replaceAll('-', '') || new Date().toISOString().slice(0, 10).replaceAll('-', '');
+    const nextId = `AS-${datePart}-${String(nextSequence++).padStart(4, '0')}`;
+    usedIds.add(nextId);
+    changed = true;
+    return { ...asset, id: nextId };
+  });
+
+  if (changed) await saveAssets(normalizedAssets);
+  return normalizedAssets;
 }
 
 async function saveAssets(assets: Asset[]) {
   await writeJsonFile(assetsFile, assets);
+}
+
+let assetMutationQueue = Promise.resolve();
+function enqueueAssetMutation<T>(mutation: () => Promise<T>) {
+  const result = assetMutationQueue.then(mutation, mutation);
+  assetMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
 }
 
 async function readUsers(): Promise<User[]> {
@@ -293,25 +326,33 @@ app.get('/api/assets', async (_req, res, next) => {
 
 app.post('/api/assets', async (req, res, next) => {
   try {
-    const input = assetInputSchema.parse(req.body);
-    const assets = await readAssets();
-    const serialNumber = input.serialNumber.toLowerCase();
-    if (serialNumber && assets.some((asset) => asset.serialNumber.trim().toLowerCase() === serialNumber)) {
-      return res.status(409).json({ message: 'Serial Number นี้มีอยู่ในระบบแล้ว' });
-    }
+    const asset = await enqueueAssetMutation(async () => {
+      const input = assetInputSchema.parse(req.body);
+      const assets = await readAssets();
+      const serialNumber = input.serialNumber.toLowerCase();
+      if (serialNumber && assets.some((asset) => asset.serialNumber.trim().toLowerCase() === serialNumber)) {
+        throw Object.assign(new Error('Serial Number นี้มีอยู่ในระบบแล้ว'), { statusCode: 409 });
+      }
 
-    const now = new Date().toISOString();
-    const datePart = now.slice(0, 10).replaceAll('-', '');
-    const asset: Asset = {
-      ...input,
-      id: `AS-${datePart}-${String(assets.length + 1).padStart(4, '0')}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    assets.unshift(asset);
-    await saveAssets(assets);
+      const now = new Date().toISOString();
+      const datePart = now.slice(0, 10).replaceAll('-', '');
+      const nextSequence = assets.reduce((highest, existingAsset) => {
+        const match = existingAsset.id.match(/^AS-\d{8}-(\d{4})$/);
+        return match ? Math.max(highest, Number(match[1])) : highest;
+      }, 0) + 1;
+      const nextAsset: Asset = {
+        ...input,
+        id: `AS-${datePart}-${String(nextSequence).padStart(4, '0')}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      assets.unshift(nextAsset);
+      await saveAssets(assets);
+      return nextAsset;
+    });
     res.status(201).json(asset);
   } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 409) return res.status(409).json({ message: (error as Error).message });
     if (error instanceof z.ZodError) return sendValidationError(res, error);
     next(error);
   }
@@ -541,7 +582,10 @@ app.patch('/api/tickets/:id', async (req, res, next) => {
 
 app.patch('/api/tickets/:id/approval', async (req, res, next) => {
   try {
-    const { decision, approvedBy } = approvalSchema.parse(req.body);
+    const { decision, approvedBy, approverStaffId } = approvalSchema.parse(req.body);
+    const users = await readUsers();
+    const approver = users.find((user) => user.staffId === approverStaffId);
+    if (!approver || approver.role !== 'admin') return res.status(403).json({ message: 'เฉพาะผู้ดูแลระบบเท่านั้นที่อนุมัติ Ticket ได้' });
     const tickets = await readTickets();
     const index = tickets.findIndex((ticket) => ticket.id === req.params.id);
     if (index === -1) return res.status(404).json({ message: 'ไม่พบ Ticket' });
