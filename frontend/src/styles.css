@@ -1338,6 +1338,34 @@ input[type='date'] {
   color: #347477;
 }
 
+.branch-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1a6378;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.branch-link:hover {
+  color: #124b5d;
+}
+
+.selected-finance-row {
+  background: #eef8f5;
+}
+
+.finance-detail-panel {
+  margin-top: 18px;
+}
+
+.finance-detail-table {
+  min-width: 980px;
+}
+
 .branch-budget b.over-budget {
   color: #b33e37;
 }

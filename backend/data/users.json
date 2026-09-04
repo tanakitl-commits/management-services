@@ -22,7 +22,8 @@
       "tickets": true,
       "assets": true,
       "reports": true,
-      "administrator": false
+      "administrator": false,
+      "finance": false
     }
   }
 ]

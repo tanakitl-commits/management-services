@@ -168,14 +168,29 @@
       "fullName": "Gaysorn Village"
     },
     {
+      "id": "216 - GSV - Gaysorn Village",
+      "shortName": "",
+      "fullName": "216 - GSV - Gaysorn Village"
+    },
+    {
       "id": "218",
       "shortName": "CMC",
       "fullName": "Central Mahachai"
     },
     {
+      "id": "218 - CMC - Central Mahachai",
+      "shortName": "",
+      "fullName": "218 - CMC - Central Mahachai"
+    },
+    {
       "id": "220",
       "shortName": "CPF",
       "fullName": "Central Phuket"
+    },
+    {
+      "id": "220 - CPF - Central Phuket",
+      "shortName": "",
+      "fullName": "220 - CPF - Central Phuket"
     },
     {
       "id": "222",

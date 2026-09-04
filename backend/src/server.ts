@@ -18,6 +18,7 @@ const permissionSchema = z.object({
   tickets: z.boolean(),
   assets: z.boolean(),
   reports: z.boolean(),
+  finance: z.boolean(),
   administrator: z.boolean(),
 });
 const attachmentSchema = z.object({
@@ -330,8 +331,10 @@ app.post('/api/assets', async (req, res, next) => {
       const input = assetInputSchema.parse(req.body);
       const assets = await readAssets();
       const serialNumber = input.serialNumber.toLowerCase();
-      if (serialNumber && assets.some((asset) => asset.serialNumber.trim().toLowerCase() === serialNumber)) {
-        throw Object.assign(new Error('Serial Number นี้มีอยู่ในระบบแล้ว'), { statusCode: 409 });
+      const duplicateAssets = serialNumber ? assets.filter((asset) => asset.serialNumber.trim().toLowerCase() === serialNumber) : [];
+      if (duplicateAssets.length) {
+        const branches = [...new Set(duplicateAssets.map((asset) => asset.location))].join(', ');
+        throw Object.assign(new Error(`Serial Number นี้มีอยู่ที่สาขา ${branches}`), { statusCode: 409 });
       }
 
       const now = new Date().toISOString();
@@ -366,8 +369,10 @@ app.patch('/api/assets/:id', async (req, res, next) => {
     if (index === -1) return res.status(404).json({ message: 'ไม่พบอุปกรณ์' });
 
     const serialNumber = patch.serialNumber?.toLowerCase();
-    if (serialNumber && assets.some((asset) => asset.id !== req.params.id && asset.serialNumber.trim().toLowerCase() === serialNumber)) {
-      return res.status(409).json({ message: 'Serial Number นี้มีอยู่ในระบบแล้ว' });
+    const duplicateAssets = serialNumber ? assets.filter((asset) => asset.id !== req.params.id && asset.serialNumber.trim().toLowerCase() === serialNumber) : [];
+    if (duplicateAssets.length) {
+      const branches = [...new Set(duplicateAssets.map((asset) => asset.location))].join(', ');
+      return res.status(409).json({ message: `Serial Number นี้มีอยู่ที่สาขา ${branches}` });
     }
 
     const asset = { ...assets[index], ...patch, updatedAt: new Date().toISOString() };
@@ -417,6 +422,7 @@ app.post('/api/users', async (req, res, next) => {
         tickets: true,
         assets: true,
         reports: true,
+        finance: true,
         administrator: true,
       } : input.permissions,
     };
@@ -446,6 +452,7 @@ app.patch('/api/users/:staffId', async (req, res, next) => {
             tickets: true,
             assets: true,
             reports: true,
+            finance: true,
             administrator: true,
           }
         : { ...users[index].permissions, ...patch.permissions },

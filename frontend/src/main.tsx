@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardList,
   Download,
+  DollarSign,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -21,7 +22,7 @@ import {
 import './styles.css';
 
 type Status = 'Pending' | 'In Progress' | 'Completed' | 'Rejected';
-type View = 'dashboard' | 'tickets' | 'reports' | 'assets' | 'admin';
+type View = 'dashboard' | 'tickets' | 'reports' | 'finance' | 'assets' | 'admin';
 type ReportPeriod = 'range' | 'month' | 'year';
 type Language = 'th' | 'en';
 type Attachment = {
@@ -66,6 +67,7 @@ type UserPermission = {
   tickets: boolean;
   assets: boolean;
   reports: boolean;
+  finance: boolean;
   administrator: boolean;
 };
 type User = {
@@ -169,8 +171,8 @@ const getAssetUsageMonths = (asset: Asset) => {
 const formatAssetUsageDuration = (months: number, language: Language = 'th') => language === 'en' ? `${Math.floor(months / 12)}y ${months % 12}m` : `${Math.floor(months / 12)} ปี ${months % 12} เดือน`;
 
 const translations = {
-  th: { workspace: 'WORKSPACE', tickets: 'จัดการ Ticket', assets: 'จัดเก็บอุปกรณ์', reports: 'รายงานย้อนหลัง', admin: 'ผู้ดูแลระบบ', subtitle: 'ติดตาม แก้ไข และอนุมัติคำขอจากทุกสาขา', logout: 'ออกจากระบบ', language: 'English', dashboardReport: 'ดึงรายงาน Dashboard', downloadAll: 'ดาวน์โหลดทุกคอลัมน์', selectRange: 'เลือกช่วงวันที่', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'แสดง Ticket', assetItems: 'รายการ และ Asset', items: 'รายการตามช่วงเวลาที่เลือก', totalTickets: 'รวม Ticket', pendingApproval: 'รออนุมัติ', equipmentInUse: 'อุปกรณ์ใช้งาน', maintenance: 'ซ่อมบำรุง' },
-  en: { workspace: 'WORKSPACE', tickets: 'Ticket Management', assets: 'Asset Inventory', reports: 'Historical Reports', admin: 'Administrator', subtitle: 'Track, resolve, and approve requests from every branch', logout: 'Log out', language: 'ไทย', dashboardReport: 'Dashboard Report', downloadAll: 'Download all columns', selectRange: 'Date range', selectMonth: 'Month', selectYear: 'Year', from: 'From', to: 'To', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'Showing', assetItems: 'tickets and', items: 'assets for the selected period', totalTickets: 'Total Tickets', pendingApproval: 'Pending Approval', equipmentInUse: 'Assets In Use', maintenance: 'Maintenance' },
+  th: { workspace: 'WORKSPACE', tickets: 'จัดการ Ticket', assets: 'จัดเก็บอุปกรณ์', reports: 'รายงานย้อนหลัง', finance: 'การเงิน', admin: 'ผู้ดูแลระบบ', subtitle: 'ติดตาม แก้ไข และอนุมัติคำขอจากทุกสาขา', logout: 'ออกจากระบบ', language: 'English', dashboardReport: 'ดึงรายงาน Dashboard', downloadAll: 'ดาวน์โหลดทุกคอลัมน์', selectRange: 'เลือกช่วงวันที่', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'แสดง Ticket', assetItems: 'รายการ และ Asset', items: 'รายการตามช่วงเวลาที่เลือก', totalTickets: 'รวม Ticket', pendingApproval: 'รออนุมัติ', equipmentInUse: 'อุปกรณ์ใช้งาน', maintenance: 'ซ่อมบำรุง' },
+  en: { workspace: 'WORKSPACE', tickets: 'Ticket Management', assets: 'Asset Inventory', reports: 'Historical Reports', finance: 'Finance', admin: 'Administrator', subtitle: 'Track, resolve, and approve requests from every branch', logout: 'Log out', language: 'ไทย', dashboardReport: 'Dashboard Report', downloadAll: 'Download all columns', selectRange: 'Date range', selectMonth: 'Month', selectYear: 'Year', from: 'From', to: 'To', month: 'Month', year: 'Year', allMonths: 'All months', allYears: 'All years', showing: 'Showing', assetItems: 'tickets and', items: 'assets for the selected period', totalTickets: 'Total Tickets', pendingApproval: 'Pending Approval', equipmentInUse: 'Assets In Use', maintenance: 'Maintenance' },
 } as const;
 let activeLanguage: Language = 'th';
 
@@ -180,6 +182,7 @@ const defaultUserPermissions = (): UserPermission => ({
   tickets: true,
   assets: true,
   reports: true,
+  finance: true,
   administrator: false,
 });
 const normalizeUserPermissions = (role: 'admin' | 'user', permissions?: Partial<UserPermission>): UserPermission => {
@@ -188,6 +191,7 @@ const normalizeUserPermissions = (role: 'admin' | 'user', permissions?: Partial<
     tickets: permissions?.tickets ?? true,
     assets: permissions?.assets ?? true,
     reports: permissions?.reports ?? true,
+    finance: permissions?.finance ?? true,
     administrator: permissions?.administrator ?? false,
   };
 
@@ -197,6 +201,7 @@ const normalizeUserPermissions = (role: 'admin' | 'user', permissions?: Partial<
       tickets: true,
       assets: true,
       reports: true,
+      finance: true,
       administrator: true,
     };
   }
@@ -290,7 +295,11 @@ function App() {
 
   async function loadUsers() {
     try {
-      setUsers(await request<User[]>('/api/users'));
+      const loadedUsers = await request<User[]>('/api/users');
+      setUsers(loadedUsers.map((user) => ({
+        ...user,
+        permissions: normalizeUserPermissions(user.role, user.permissions),
+      })));
     } catch (loadError) {
       setError((loadError as Error).message);
     }
@@ -497,7 +506,11 @@ function App() {
       && asset.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase(),
     );
     if (isDuplicateSerial) {
-      setError(activeLanguage === 'en' ? `Serial Number ${serialNumber} already exists` : `Serial Number ${serialNumber} มีอยู่ในระบบแล้ว`);
+      const duplicateBranches = [...new Set(assets.filter((asset) =>
+        asset.id !== (assetModal !== 'new' ? assetModal?.id : undefined)
+        && asset.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase(),
+      ).map((asset) => asset.location))].join(', ');
+      setError(activeLanguage === 'en' ? `Serial Number ${serialNumber} already exists at ${duplicateBranches}` : `Serial Number ${serialNumber} มีอยู่ที่สาขา ${duplicateBranches}`);
       return;
     }
 
@@ -547,7 +560,7 @@ function App() {
             name: user.name,
             password: user.password,
             role: user.role,
-            permissions: { ...user.permissions },
+            permissions: normalizeUserPermissions(user.role, user.permissions),
           }
         : {
             staffId: '',
@@ -596,6 +609,7 @@ function App() {
 
   const pending = tickets.filter((ticket) => !ticket.approval).length;
   const isAdmin = users.some((user) => user.staffId === currentStaffId && user.role === 'admin');
+  const hasFinanceAccess = isAdmin || users.some((user) => user.staffId === currentStaffId && user.permissions.finance);
 
   return (
     <div className="shell">
@@ -622,6 +636,11 @@ function App() {
           <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
             <BarChart3 size={17} /> {t.reports}
           </button>
+          {hasFinanceAccess && (
+            <button className={view === 'finance' ? 'active' : ''} onClick={() => setView('finance')}>
+              <DollarSign size={17} /> {t.finance}
+            </button>
+          )}
           <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}>
             <Monitor size={17} /> {t.admin}
           </button>
@@ -641,6 +660,7 @@ function App() {
               {view === 'tickets' && t.tickets}
               {view === 'assets' && t.assets}
               {view === 'reports' && t.reports}
+              {view === 'finance' && t.finance}
               {view === 'admin' && t.admin}
             </h1>
             <p>{t.subtitle}</p>
@@ -733,6 +753,8 @@ function App() {
         {view === 'assets' && <AssetView assets={assets} language={language} onAdd={() => openAssetForm()} onEdit={(asset) => openAssetForm(asset)} onDelete={(asset) => void deleteAsset(asset)} />}
 
         {view === 'reports' && <Reports tickets={reportTickets} language={language} years={reportYears} period={reportPeriod} startDate={reportStartDate} endDate={reportEndDate} month={reportMonth} year={reportYear} onPeriodChange={setReportPeriod} onStartDateChange={setReportStartDate} onEndDateChange={setReportEndDate} onMonthChange={setReportMonth} onYearChange={setReportYear} onExport={exportCsv} />}
+
+        {view === 'finance' && hasFinanceAccess && <FinanceView assets={assets} language={language} masterData={masterData} />}
 
         {view === 'admin' && (
           <AdminView
@@ -1093,6 +1115,86 @@ function DashboardView({ tickets, assets, users, masterData, language, period, s
   );
 }
 
+function FinanceView({ assets, language, masterData }: { assets: Asset[]; language: Language; masterData: MasterData }) {
+  const english = language === 'en';
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const locationsByIdentity = new Map(masterData.locations.map((location) => [locationIdentity(location), location]));
+  const branchTotals = Object.values(assets.reduce<Record<string, { location: LocationMasterItem; count: number; thb: number; usd: number }>>((result, asset) => {
+    const identity = locationIdentity(asset.location);
+    const location = locationsByIdentity.get(identity) ?? normalizeLocationEntry(asset.location);
+    const current = result[identity] ?? { location, count: 0, thb: 0, usd: 0 };
+    current.count += 1;
+    current.thb += asset.priceBeforeVat ?? 0;
+    current.usd += asset.priceBeforeVatUsd ?? (asset.priceBeforeVat ?? 0) / usdExchangeRate;
+    result[identity] = current;
+    return result;
+  }, {})).sort((first, second) => second.thb - first.thb);
+  const totalThb = branchTotals.reduce((total, branch) => total + branch.thb, 0);
+  const totalUsd = branchTotals.reduce((total, branch) => total + branch.usd, 0);
+  const selectedBranchData = branchTotals.find(({ location }) => locationIdentity(location) === selectedBranch);
+  const selectedBranchAssets = selectedBranch
+    ? assets.filter((asset) => locationIdentity(asset.location) === selectedBranch)
+    : [];
+  const exportFinanceCsv = () => {
+    const rows = [
+      [english ? 'Branch' : 'สาขา', english ? 'Asset count' : 'จำนวนอุปกรณ์', 'Total (THB)', 'Total (USD)'],
+      ...branchTotals.map(({ location, count, thb, usd }) => [formatLocationLabel(location), count, thb.toFixed(2), usd.toFixed(2)]),
+    ].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' }));
+    link.download = 'finance-report.csv';
+    link.click();
+  };
+
+  return (
+    <>
+      <section className="stats">
+        <Stat label={english ? 'Total asset value (THB)' : 'มูลค่าอุปกรณ์รวม (THB)'} value={totalThb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} note="THB" />
+        <Stat label={english ? 'Total asset value (USD)' : 'มูลค่าอุปกรณ์รวม (USD)'} value={`$${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} note="USD" />
+        <Stat label={english ? 'Asset count' : 'จำนวนอุปกรณ์'} value={assets.length} note={english ? 'assets' : 'เครื่อง'} />
+        <Stat label={english ? 'Branches with assets' : 'สาขาที่มีอุปกรณ์'} value={branchTotals.length} note={english ? 'branches' : 'สาขา'} />
+      </section>
+      <section className="panel finance-panel">
+        <div className="panel-head">
+          <h2>{english ? 'Finance by branch' : 'สรุปการเงินรายสาขา'}</h2>
+          <button className="ghost" onClick={exportFinanceCsv}><Download size={15} /> {english ? 'Download CSV' : 'ดาวน์โหลด CSV'}</button>
+        </div>
+        <div className="table-wrap">
+          <table className="dashboard-table finance-table">
+            <thead><tr><th>{english ? 'Branch' : 'สาขา'}</th><th>{english ? 'Assets' : 'อุปกรณ์'}</th><th>Total THB</th><th>Total USD</th></tr></thead>
+            <tbody>
+              {branchTotals.length ? branchTotals.map(({ location, count, thb, usd }) => (
+                <tr key={locationIdentity(location)} className={selectedBranch === locationIdentity(location) ? 'selected-finance-row' : ''}>
+                  <td><button type="button" className="branch-link" onClick={() => setSelectedBranch(locationIdentity(location))}>{formatLocationLabel(location)}</button></td>
+                  <td>{count}</td>
+                  <td>{thb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              )) : <tr><td className="empty-location-row" colSpan={4}>{english ? 'No asset spending data' : 'ยังไม่มีข้อมูลค่าใช้จ่าย'}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {selectedBranchData && (
+        <section className="panel finance-detail-panel">
+          <div className="panel-head">
+            <h2>{english ? `Assets at ${formatLocationLabel(selectedBranchData.location)}` : `อุปกรณ์ของ ${formatLocationLabel(selectedBranchData.location)}`}</h2>
+            <button type="button" className="ghost" onClick={() => setSelectedBranch(null)}>{english ? 'Close' : 'ปิด'}</button>
+          </div>
+          <div className="table-wrap">
+            <table className="dashboard-table finance-detail-table">
+              <thead><tr><th>ID</th><th>{english ? 'Asset' : 'อุปกรณ์'}</th><th>{english ? 'Type' : 'ประเภท'}</th><th>Serial</th><th>{english ? 'Price (THB)' : 'ราคา (THB)'}</th><th>{english ? 'Price (USD)' : 'ราคา (USD)'}</th><th>{english ? 'Status' : 'สถานะ'}</th></tr></thead>
+              <tbody>{selectedBranchAssets.map((asset) => (
+                <tr key={asset.id}><td>{asset.id}</td><td>{asset.assetName}</td><td>{asset.category}</td><td>{asset.serialNumber || '-'}</td><td>{(asset.priceBeforeVat ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td>${(asset.priceBeforeVatUsd ?? (asset.priceBeforeVat ?? 0) / usdExchangeRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td>{asset.status}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
 function AssetView({ assets, language, onAdd, onEdit, onDelete }: { assets: Asset[]; language: Language; onAdd: () => void; onEdit: (asset: Asset) => void; onDelete: (asset: Asset) => void }) {
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
@@ -1224,7 +1326,7 @@ function Login({ onLogin }: { onLogin: (staffId: string) => void }) {
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: number; note: string }) {
+function Stat({ label, value, note }: { label: string; value: number | string; note: string }) {
   return (
     <div className="stat">
       <span>{label}</span>
@@ -1761,6 +1863,10 @@ function UserModal({
               Reports
             </label>
             <label className="checkbox-row">
+              <input type="checkbox" checked={permissions.finance} onChange={(event) => update('permissions', { ...permissions, finance: event.target.checked })} />
+              Finance
+            </label>
+            <label className="checkbox-row">
               <input type="checkbox" checked={permissions.administrator} onChange={(event) => update('permissions', { ...permissions, administrator: event.target.checked })} />
               Administrator
             </label>
@@ -1806,6 +1912,7 @@ function AssetModal({
   const priceBeforeVatUsd = priceBeforeVat / usdExchangeRate;
   const serialNumber = form.serialNumber?.trim() ?? '';
   const duplicateSerial = serialNumber !== '' && assets.some((asset) => asset.id !== editingAssetId && asset.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase());
+  const duplicateSerialBranches = [...new Set(assets.filter((asset) => asset.id !== editingAssetId && asset.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase()).map((asset) => asset.location))].join(', ');
   const vendorOptions = [...new Set([...masterData.vendors, ...(form.vendor && !masterData.vendors.includes(form.vendor) ? [form.vendor] : [])])];
 
   return (
@@ -1835,7 +1942,7 @@ function AssetModal({
           <label>
             Serial Number
             <input className={duplicateSerial ? 'input-error' : ''} value={form.serialNumber ?? ''} onChange={(event) => update('serialNumber', event.target.value)} />
-            {duplicateSerial && <small className="field-error">Serial Number นี้มีอยู่ในระบบแล้ว</small>}
+            {duplicateSerial && <small className="field-error">{activeLanguage === 'en' ? `This Serial Number already exists at ${duplicateSerialBranches}` : `Serial Number นี้มีอยู่ที่สาขา ${duplicateSerialBranches}`}</small>}
           </label>
           <label>
             {activeLanguage === 'en' ? 'Location' : 'สถานที่'}
